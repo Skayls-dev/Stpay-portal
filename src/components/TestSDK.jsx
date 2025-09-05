@@ -58,9 +58,16 @@ const TestSDK = () => {
         amount: 1000,
         currency: 'XAF',
         provider: 'MTN',
-        phoneNumber: '237677123456',
-        customerName: 'Test User',
-        customerEmail: 'test@example.com',
+        customer: {
+          phoneNumber: '237677123456',
+          email: 'test@example.com',
+          name: 'Test User'
+        },
+        merchant: {
+          reference: 'TEST_MERCHANT_001',
+          callbackUrl: 'http://localhost:3000/callback',
+          name: 'Test Merchant'
+        },
         description: 'Test SDK Payment'
       };
 

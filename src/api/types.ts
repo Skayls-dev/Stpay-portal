@@ -39,14 +39,15 @@ export interface PaymentStatusResponse {
 }
 
 export interface CustomerInfo {
-  name: string;
-  email: string;
-  phone: string;
+  name?: string;
+  email?: string;
+  phoneNumber: string;  // Correspond au backend: PhoneNumber
 }
 
 export interface MerchantInfo {
-  name: string;
-  id: string;
+  name?: string;
+  reference: string;  // Correspond au backend: Reference
+  callbackUrl?: string;  // Correspond au backend: CallbackUrl
 }
 
 export interface ErrorResponse {
