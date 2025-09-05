@@ -1,0 +1,14 @@
+{
+  "input": "./stpay-api.json",
+  "output": {
+    "path": "src/api",
+    "format": "prettier"
+  },
+  "client": {
+    "name": "@hey-api/client-fetch"
+  },
+  "types": {
+    "dates": "types+transform",
+    "export": true
+  }
+}
