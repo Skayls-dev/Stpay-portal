@@ -1,15 +1,16 @@
-// Hooks React personnalisés pour l'API ST Pay
-import { useState, useEffect, useCallback } from 'react';
-import {
-  PaymentRequest,
-  PaymentResponse,
-  PaymentStatusResponse
-} from './types';
+import { useCallback, useEffect, useState } from 'react';
+import type { PaymentRequest, PaymentResponse, PaymentStatusResponse } from './types';
 import { paymentService, statusService } from './services';
 
-/**
- * Hook pour traiter un paiement
- */
+const toMessage = (err: unknown, fallback: string): string => {
+  if (err && typeof err === 'object') {
+    const candidate = err as { message?: string; response?: { Error?: string } };
+    return candidate.response?.Error || candidate.message || fallback;
+  }
+  if (typeof err === 'string') return err;
+  return fallback;
+};
+
 export function usePaymentProcess() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,9 +25,8 @@ export function usePaymentProcess() {
       const response = await paymentService.processPayment(request);
       setResult(response);
       return response;
-    } catch (err: any) {
-      const errorMessage = err.response?.Error || err.message || 'Erreur lors du traitement du paiement';
-      setError(errorMessage);
+    } catch (err) {
+      setError(toMessage(err, 'Erreur lors du traitement du paiement'));
       throw err;
     } finally {
       setIsLoading(false);
@@ -44,37 +44,36 @@ export function usePaymentProcess() {
     isLoading,
     error,
     result,
-    reset
+    reset,
   };
 }
 
-/**
- * Hook pour récupérer le statut d'un paiement
- */
 export function usePaymentStatus(paymentId?: string) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<PaymentStatusResponse | null>(null);
 
-  const fetchStatus = useCallback(async (id?: string) => {
-    const targetId = id || paymentId;
-    if (!targetId) return;
+  const fetchStatus = useCallback(
+    async (id?: string) => {
+      const targetId = id || paymentId;
+      if (!targetId) return;
 
-    setIsLoading(true);
-    setError(null);
+      setIsLoading(true);
+      setError(null);
 
-    try {
-      const response = await paymentService.getStatus(targetId);
-      setStatus(response);
-      return response;
-    } catch (err: any) {
-      const errorMessage = err.response?.Error || err.message || 'Erreur lors de la récupération du statut';
-      setError(errorMessage);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [paymentId]);
+      try {
+        const response = await paymentService.getStatus(targetId);
+        setStatus(response);
+        return response;
+      } catch (err) {
+        setError(toMessage(err, 'Erreur lors de la récupération du statut'));
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [paymentId]
+  );
 
   const refresh = useCallback(() => {
     if (paymentId) {
@@ -94,16 +93,13 @@ export function usePaymentStatus(paymentId?: string) {
     isLoading,
     error,
     status,
-    canCancel: status ? statusService.canCancel(status.status) : false,
-    isCompleted: status ? statusService.isCompleted(status.status) : false,
-    isPending: status ? statusService.isPending(status.status) : false,
-    isFailed: status ? statusService.isFailed(status.status) : false
+    canCancel: status ? statusService.canCancel(status.status || '') : false,
+    isCompleted: status ? statusService.isCompleted(status.status || '') : false,
+    isPending: status ? statusService.isPending(status.status || '') : false,
+    isFailed: status ? statusService.isFailed(status.status || '') : false,
   };
 }
 
-/**
- * Hook pour annuler un paiement
- */
 export function usePaymentCancel() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,11 +109,9 @@ export function usePaymentCancel() {
     setError(null);
 
     try {
-      const response = await paymentService.cancel(paymentId);
-      return response;
-    } catch (err: any) {
-      const errorMessage = err.response?.Error || err.message || 'Erreur lors de l\'annulation du paiement';
-      setError(errorMessage);
+      return await paymentService.cancel(paymentId);
+    } catch (err) {
+      setError(toMessage(err, 'Erreur lors de l\'annulation du paiement'));
       throw err;
     } finally {
       setIsLoading(false);
@@ -127,13 +121,10 @@ export function usePaymentCancel() {
   return {
     cancelPayment,
     isLoading,
-    error
+    error,
   };
 }
 
-/**
- * Hook pour récupérer l'historique des paiements
- */
 export function usePaymentHistory() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -147,9 +138,8 @@ export function usePaymentHistory() {
       const response = await paymentService.getHistory();
       setPayments(response);
       return response;
-    } catch (err: any) {
-      const errorMessage = err.response?.Error || err.message || 'Erreur lors de la récupération de l\'historique';
-      setError(errorMessage);
+    } catch (err) {
+      setError(toMessage(err, 'Erreur lors de la récupération de l\'historique'));
       throw err;
     } finally {
       setIsLoading(false);
@@ -169,38 +159,33 @@ export function usePaymentHistory() {
     refresh,
     isLoading,
     error,
-    payments
+    payments,
   };
 }
 
-/**
- * Hook pour gérer les notifications/toasts automatiques
- */
 export function useApiNotifications() {
   const showSuccess = useCallback((message: string) => {
-    // Utilise react-hot-toast si disponible
     if (typeof window !== 'undefined' && (window as any).toast) {
       (window as any).toast.success(message);
-    } else {
-      console.log('✅ ' + message);
+      return;
     }
+    console.log('✅ ' + message);
   }, []);
 
   const showError = useCallback((message: string) => {
     if (typeof window !== 'undefined' && (window as any).toast) {
       (window as any).toast.error(message);
-    } else {
-      console.error('❌ ' + message);
+      return;
     }
+    console.error('❌ ' + message);
   }, []);
 
   const showLoading = useCallback((message: string) => {
     if (typeof window !== 'undefined' && (window as any).toast) {
       return (window as any).toast.loading(message);
-    } else {
-      console.log('⏳ ' + message);
-      return null;
     }
+    console.log('⏳ ' + message);
+    return null;
   }, []);
 
   const dismiss = useCallback((toastId?: string) => {
@@ -213,35 +198,30 @@ export function useApiNotifications() {
     showSuccess,
     showError,
     showLoading,
-    dismiss
+    dismiss,
   };
 }
 
-/**
- * Hook pour polling automatique du statut d'un paiement
- */
-export function usePaymentPolling(paymentId?: string, interval: number = 5000) {
+export function usePaymentPolling(paymentId?: string, interval = 5000) {
   const [isPolling, setIsPolling] = useState(false);
   const { fetchStatus, status, error } = usePaymentStatus();
 
   const startPolling = useCallback(() => {
     if (!paymentId || isPolling) return;
-    
+
     setIsPolling(true);
     const intervalId = setInterval(async () => {
       try {
         const currentStatus = await fetchStatus(paymentId);
-        
-        // Arrêter le polling si le paiement est terminé
-        if (currentStatus && (
-          statusService.isCompleted(currentStatus.status) ||
-          statusService.isFailed(currentStatus.status)
-        )) {
+        const value = currentStatus?.status || '';
+
+        if (statusService.isCompleted(value) || statusService.isFailed(value)) {
           setIsPolling(false);
           clearInterval(intervalId);
         }
-      } catch (err) {
-        console.error('Erreur lors du polling:', err);
+      } catch {
+        clearInterval(intervalId);
+        setIsPolling(false);
       }
     }, interval);
 
@@ -260,6 +240,6 @@ export function usePaymentPolling(paymentId?: string, interval: number = 5000) {
     stopPolling,
     isPolling,
     status,
-    error
+    error,
   };
 }

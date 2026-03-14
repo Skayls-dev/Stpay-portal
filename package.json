@@ -8,8 +8,8 @@
     "build": "vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "generate-api": "openapi-ts --config openapi.config.json",
-    "generate-api:watch": "openapi-ts --config openapi.config.json --watch"
+    "generate-api": "openapi-ts -f openapi.config.json",
+    "generate-api:watch": "openapi-ts -f openapi.config.json --watch"
   },
   "dependencies": {
     "@hey-api/client-fetch": "^0.13.1",

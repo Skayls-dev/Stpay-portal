@@ -1,30 +1,22 @@
-// Point d'entrée principal pour l'API ST Pay SDK
+export * from './types.gen';
+export * from './sdk.gen';
 
-// Export des types
-export * from './types';
+export { ApiClient, apiClient } from './compat-client';
 
-// Export du client principal
-export { ApiClient, apiClient } from './client';
-
-// Export des services
 export {
-  PaymentService,
-  PaymentValidationService,
-  PaymentStatusService,
-  paymentService,
-  validationService,
-  statusService
+	PaymentService,
+	PaymentValidationService,
+	PaymentStatusService,
+	paymentService,
+	validationService,
+	statusService,
 } from './services';
 
-// Export des hooks React personnalisés
-export * from './hooks';
-
-// Configuration par défaut
-export const DEFAULT_CONFIG = {
-  baseUrl: 'http://localhost:5169',
-  timeout: 30000,
-  retries: 3
-};
-
-// Version du SDK
-export const SDK_VERSION = '1.0.0';
+export {
+	usePaymentProcess,
+	usePaymentStatus,
+	usePaymentCancel,
+	usePaymentHistory,
+	useApiNotifications,
+	usePaymentPolling,
+} from './hooks';

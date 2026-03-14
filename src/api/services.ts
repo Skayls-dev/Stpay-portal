@@ -1,81 +1,152 @@
-// Services spécialisés pour l'API ST Pay
-import { apiClient } from './client';
-import {
+import { apiClient } from './compat-client';
+import type {
+  CustomerInfo,
+  MerchantInfo,
   PaymentRequest,
   PaymentResponse,
-  PaymentStatusResponse
+  PaymentStatusResponse,
 } from './types';
 
-/**
- * Service de gestion des paiements
- */
+const toRecord = (value: unknown): Record<string, unknown> => {
+  if (value && typeof value === 'object') {
+    return value as Record<string, unknown>;
+  }
+  return {};
+};
+
+const firstString = (...values: unknown[]): string | undefined => {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value;
+    }
+  }
+  return undefined;
+};
+
+const firstNumber = (...values: unknown[]): number | undefined => {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string') {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) {
+        return parsed;
+      }
+    }
+  }
+  return undefined;
+};
+
+const normalizeCustomer = (input: unknown): CustomerInfo | undefined => {
+  const source = toRecord(input);
+  if (Object.keys(source).length === 0) return undefined;
+
+  const phoneNumber = firstString(source.phoneNumber, source.phone);
+  if (!phoneNumber) return undefined;
+
+  return {
+    phoneNumber,
+    phone: phoneNumber,
+    name: firstString(source.name) ?? null,
+    email: firstString(source.email) ?? null,
+  };
+};
+
+const normalizeMerchant = (input: unknown): MerchantInfo | undefined => {
+  const source = toRecord(input);
+  if (Object.keys(source).length === 0) return undefined;
+
+  const reference = firstString(source.reference, source.id);
+  if (!reference) return undefined;
+
+  return {
+    reference,
+    id: reference,
+    name: firstString(source.name) ?? null,
+    callbackUrl: firstString(source.callbackUrl) ?? null,
+  };
+};
+
+const normalizePayment = (input: unknown): PaymentStatusResponse => {
+  const source = toRecord(input);
+  const customer = normalizeCustomer(source.customer);
+  const merchant = normalizeMerchant(source.merchant);
+  const amount = firstNumber(source.amount);
+
+  const normalized: PaymentStatusResponse = {
+    id: firstString(source.id, source.transactionId, source.paymentId),
+    transactionId: firstString(source.transactionId, source.id, source.paymentId),
+    status: firstString(source.status, source.state) ?? 'unknown',
+    amount,
+    currency: firstString(source.currency) ?? 'XAF',
+    provider: firstString(source.provider) ?? 'UNKNOWN',
+    providerTransactionId: firstString(source.providerTransactionId),
+    paymentUrl: firstString(source.paymentUrl),
+    message: firstString(source.message),
+    description: firstString(source.description),
+    errorMessage: firstString(source.errorMessage, source.error),
+    createdAt: firstString(source.createdAt, source.timestamp),
+    updatedAt: firstString(source.updatedAt, source.timestamp),
+    customer,
+    merchant,
+    customerName: customer?.name ?? undefined,
+    phoneNumber: customer?.phoneNumber ?? undefined,
+  };
+
+  return {
+    ...source,
+    ...normalized,
+  };
+};
+
+const normalizePaymentList = (payload: unknown): PaymentStatusResponse[] => {
+  if (Array.isArray(payload)) {
+    return payload.map(normalizePayment);
+  }
+
+  const source = toRecord(payload);
+
+  if (Array.isArray(source.items)) {
+    return source.items.map(normalizePayment);
+  }
+
+  if (Array.isArray(source.data)) {
+    return source.data.map(normalizePayment);
+  }
+
+  if (Array.isArray(source.Data)) {
+    return source.Data.map(normalizePayment);
+  }
+
+  return [];
+};
+
 export class PaymentService {
   constructor(private client = apiClient) {}
 
-  /**
-   * Traite un nouveau paiement
-   */
   async processPayment(request: PaymentRequest): Promise<PaymentResponse> {
-    try {
-      return await this.client.processPayment(request);
-    } catch (error) {
-      console.error('Erreur lors du traitement du paiement:', error);
-      throw error;
-    }
+    const response = await this.client.processPayment(request);
+    return normalizePayment(response);
   }
 
-  /**
-   * Récupère le statut d'un paiement
-   */
   async getStatus(paymentId: string): Promise<PaymentStatusResponse> {
-    try {
-      return await this.client.getPaymentStatus(paymentId);
-    } catch (error) {
-      console.error('Erreur lors de la récupération du statut:', error);
-      throw error;
-    }
+    const response = await this.client.getPaymentStatus(paymentId);
+    return normalizePayment(response);
   }
 
-  /**
-   * Annule un paiement
-   */
   async cancel(paymentId: string): Promise<PaymentStatusResponse> {
-    try {
-      return await this.client.cancelPayment(paymentId);
-    } catch (error) {
-      console.error('Erreur lors de l\'annulation du paiement:', error);
-      throw error;
-    }
+    const response = await this.client.cancelPayment(paymentId);
+    return normalizePayment(response);
   }
 
-  /**
-   * Récupère l'historique des paiements
-   */
   async getHistory(): Promise<PaymentStatusResponse[]> {
-    try {
-      const response = await this.client.getAllPayments();
-      // Le backend retourne { Success: true, Data: [], Message: "...", Timestamp: "..." }
-      // Nous devons extraire le tableau des données
-      if (response && typeof response === 'object' && 'Data' in response) {
-        return (response as any).Data || [];
-      }
-      // Si c'est déjà un tableau, le retourner tel quel
-      return Array.isArray(response) ? response : [];
-    } catch (error) {
-      console.error('Erreur lors de la récupération de l\'historique:', error);
-      // En cas d'erreur, retourner un tableau vide pour éviter les erreurs de type
-      return [];
-    }
+    const response = await this.client.getAllPayments();
+    return normalizePaymentList(response);
   }
 }
 
-/**
- * Service de validation des paiements
- */
 export class PaymentValidationService {
-  /**
-   * Valide les données d'un paiement
-   */
   static validatePaymentRequest(request: Partial<PaymentRequest>): string[] {
     const errors: string[] = [];
 
@@ -87,33 +158,16 @@ export class PaymentValidationService {
       errors.push('La devise doit être un code à 3 caractères');
     }
 
-    if (!request.provider || !['MTN', 'ORANGE', 'MOOV', 'WAVE'].includes(request.provider)) {
+    if (!request.provider || !['MTN', 'ORANGE', 'MOOV', 'WAVE'].includes(request.provider.toUpperCase())) {
       errors.push('Le fournisseur doit être MTN, ORANGE, MOOV ou WAVE');
     }
 
-    if (!request.customer) {
-      errors.push('Les informations client sont requises');
-    } else {
-      if (!request.customer.name?.trim()) {
-        errors.push('Le nom du client est requis');
-      }
-      if (!request.customer.email?.trim() || !this.isValidEmail(request.customer.email)) {
-        errors.push('Un email client valide est requis');
-      }
-      if (!request.customer.phone?.trim()) {
-        errors.push('Le téléphone du client est requis');
-      }
+    if (!request.customer?.phoneNumber?.trim()) {
+      errors.push('Le téléphone du client est requis');
     }
 
-    if (!request.merchant) {
-      errors.push('Les informations marchand sont requises');
-    } else {
-      if (!request.merchant.name?.trim()) {
-        errors.push('Le nom du marchand est requis');
-      }
-      if (!request.merchant.id?.trim()) {
-        errors.push('L\'ID du marchand est requis');
-      }
+    if (!request.merchant?.reference?.trim()) {
+      errors.push('La référence marchand est requise');
     }
 
     if (request.description && request.description.length > 500) {
@@ -122,75 +176,29 @@ export class PaymentValidationService {
 
     return errors;
   }
-
-  /**
-   * Valide un email
-   */
-  private static isValidEmail(email: string): boolean {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  }
-
-  /**
-   * Valide un numéro de téléphone (format basique)
-   */
-  static isValidPhoneNumber(phone: string): boolean {
-    const phoneRegex = /^\+?[\d\s\-\(\)]+$/;
-    return phoneRegex.test(phone) && phone.replace(/\D/g, '').length >= 8;
-  }
-
-  /**
-   * Formate un montant pour l'affichage
-   */
-  static formatAmount(amount: number, currency: string): string {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: currency === 'XOF' ? 'EUR' : currency, // Fallback pour XOF
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2
-    }).format(amount).replace('€', 'XOF');
-  }
 }
 
-/**
- * Service de gestion des états de paiement
- */
 export class PaymentStatusService {
-  /**
-   * Détermine si un paiement peut être annulé
-   */
   static canCancel(status: string): boolean {
-    const cancellableStatuses = ['pending', 'processing', 'initiated'];
-    return cancellableStatuses.includes(status.toLowerCase());
+    const normalized = status.toLowerCase();
+    return ['pending', 'processing', 'initiated', 'in_progress'].includes(normalized);
   }
 
-  /**
-   * Détermine si un paiement est terminé
-   */
   static isCompleted(status: string): boolean {
-    const completedStatuses = ['completed', 'success', 'successful'];
-    return completedStatuses.includes(status.toLowerCase());
+    const normalized = status.toLowerCase();
+    return ['completed', 'success', 'successful'].includes(normalized);
   }
 
-  /**
-   * Détermine si un paiement a échoué
-   */
   static isFailed(status: string): boolean {
-    const failedStatuses = ['failed', 'error', 'rejected', 'declined'];
-    return failedStatuses.includes(status.toLowerCase());
+    const normalized = status.toLowerCase();
+    return ['failed', 'error', 'rejected', 'declined', 'cancelled', 'canceled'].includes(normalized);
   }
 
-  /**
-   * Détermine si un paiement est en cours
-   */
   static isPending(status: string): boolean {
-    const pendingStatuses = ['pending', 'processing', 'initiated', 'in_progress'];
-    return pendingStatuses.includes(status.toLowerCase());
+    const normalized = status.toLowerCase();
+    return ['pending', 'processing', 'initiated', 'in_progress'].includes(normalized);
   }
 
-  /**
-   * Retourne la classe CSS appropriée pour un statut
-   */
   static getStatusClass(status: string): string {
     if (this.isCompleted(status)) return 'status-completed';
     if (this.isFailed(status)) return 'status-failed';
@@ -198,37 +206,30 @@ export class PaymentStatusService {
     return 'status-unknown';
   }
 
-  /**
-   * Retourne un message lisible pour un statut
-   */
   static getStatusMessage(status: string): string {
     const statusMap: Record<string, string> = {
-      'pending': 'En attente',
-      'processing': 'En cours de traitement',
-      'completed': 'Terminé avec succès',
-      'success': 'Réussi',
-      'successful': 'Réussi',
-      'failed': 'Échec',
-      'error': 'Erreur',
-      'cancelled': 'Annulé',
-      'canceled': 'Annulé',
-      'rejected': 'Rejeté',
-      'declined': 'Refusé'
+      pending: 'En attente',
+      processing: 'En cours de traitement',
+      completed: 'Terminé avec succès',
+      success: 'Réussi',
+      successful: 'Réussi',
+      failed: 'Échec',
+      error: 'Erreur',
+      cancelled: 'Annulé',
+      canceled: 'Annulé',
+      rejected: 'Rejeté',
+      declined: 'Refusé',
+      initiated: 'Initié',
+      in_progress: 'En cours',
     };
-    
+
     return statusMap[status.toLowerCase()] || status;
   }
 
-  /**
-   * Retourne un libellé pour affichage (alias de getStatusMessage)
-   */
   static getStatusDisplay(status: string): string {
     return this.getStatusMessage(status);
   }
 
-  /**
-   * Retourne l'icône appropriée pour un statut
-   */
   static getStatusIcon(status: string): string {
     if (this.isCompleted(status)) return '✅';
     if (this.isFailed(status)) return '❌';
@@ -237,7 +238,6 @@ export class PaymentStatusService {
   }
 }
 
-// Instances par défaut des services
 export const paymentService = new PaymentService();
 export const validationService = PaymentValidationService;
 export const statusService = PaymentStatusService;

@@ -1,10 +1,42 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { usePaymentHistory } from '../api';
-import TestSDK from './TestSDK';
+import { apiClient, usePaymentHistory } from '../api';
 
 const Dashboard = () => {
   const { payments, isLoading } = usePaymentHistory();
+  const [obsLoading, setObsLoading] = React.useState(true);
+  const [obsStatus, setObsStatus] = React.useState({
+    health: 'unknown',
+    ready: 'unknown',
+    live: 'unknown',
+    metrics: 'unknown',
+    lastChecked: null,
+  });
+
+  const checkObservability = React.useCallback(async () => {
+    setObsLoading(true);
+
+    const checks = await Promise.allSettled([
+      apiClient.getOperationalHealth(),
+      apiClient.getReadinessHealth(),
+      apiClient.getLivenessHealth(),
+      apiClient.getPrometheusMetricsSample(),
+    ]);
+
+    setObsStatus({
+      health: checks[0].status === 'fulfilled' ? 'up' : 'down',
+      ready: checks[1].status === 'fulfilled' ? 'up' : 'down',
+      live: checks[2].status === 'fulfilled' ? 'up' : 'down',
+      metrics: checks[3].status === 'fulfilled' ? 'up' : 'down',
+      lastChecked: new Date().toLocaleTimeString(),
+    });
+
+    setObsLoading(false);
+  }, []);
+
+  React.useEffect(() => {
+    checkObservability();
+  }, [checkObservability]);
 
   // Calcul des statistiques
   const stats = React.useMemo(() => {
@@ -54,9 +86,6 @@ const Dashboard = () => {
         </p>
       </div>
 
-      {/* Test SDK Component */}
-      <TestSDK />
-
       {/* Quick Actions */}
       <div className="feature-grid">
         <div className="feature-card">
@@ -83,6 +112,33 @@ const Dashboard = () => {
           <p>Consultez l'historique complet de tous vos paiements et transactions.</p>
           <Link to="/payments" className="btn btn-secondary btn-lg" style={{ marginTop: 'var(--spacing-4)' }}>
             View History
+          </Link>
+        </div>
+        
+        <div className="feature-card">
+          <span className="icon">🎪</span>
+          <h3>Event Management</h3>
+          <p>Gérez vos événements, les réservations et les paiements de billets.</p>
+          <Link to="/events" className="btn btn-secondary btn-lg" style={{ marginTop: 'var(--spacing-4)' }}>
+            Manage Events
+          </Link>
+        </div>
+
+        <div className="feature-card">
+          <span className="icon">🧪</span>
+          <h3>API Playground</h3>
+          <p>Testez rapidement les endpoints ST Pay et inspectez les réponses.</p>
+          <Link to="/api-playground" className="btn btn-secondary btn-lg" style={{ marginTop: 'var(--spacing-4)' }}>
+            Open Playground
+          </Link>
+        </div>
+
+        <div className="feature-card">
+          <span className="icon">📱</span>
+          <h3>Mobile Payment Simulator</h3>
+          <p>Simulez en temps réel une expérience de paiement mobile complète.</p>
+          <Link to="/simulator" className="btn btn-secondary btn-lg" style={{ marginTop: 'var(--spacing-4)' }}>
+            Simulate Payment
           </Link>
         </div>
       </div>
@@ -135,6 +191,44 @@ const Dashboard = () => {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Observability */}
+      <div className="card">
+        <div className="card-header">
+          <h2>🩺 Observability</h2>
+          <button
+            type="button"
+            onClick={checkObservability}
+            className="btn btn-secondary btn-sm"
+            disabled={obsLoading}
+          >
+            {obsLoading ? 'Checking...' : 'Refresh'}
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', gap: 'var(--spacing-3)', flexWrap: 'wrap', marginBottom: 'var(--spacing-5)' }}>
+          <StatusBadge label="/health" status={obsStatus.health} />
+          <StatusBadge label="/health/ready" status={obsStatus.ready} />
+          <StatusBadge label="/health/live" status={obsStatus.live} />
+          <StatusBadge label="/metrics" status={obsStatus.metrics} />
+        </div>
+
+        <div style={{ display: 'flex', gap: 'var(--spacing-3)', flexWrap: 'wrap' }}>
+          <Link to="/api-playground" className="btn btn-primary btn-sm">
+            Open API Playground
+          </Link>
+          <a href="http://localhost:5169/health" target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm" style={{ textDecoration: 'none' }}>
+            Open /health
+          </a>
+          <a href="http://localhost:5169/metrics" target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm" style={{ textDecoration: 'none' }}>
+            Open /metrics
+          </a>
+        </div>
+
+        <p style={{ marginTop: 'var(--spacing-4)', color: 'var(--gray-500)', fontSize: '0.875rem' }}>
+          Last checked: {obsStatus.lastChecked || 'never'}
+        </p>
       </div>
 
       {/* Recent Payments */}
@@ -272,6 +366,51 @@ const RecentPaymentCard = ({ payment }) => {
         </span>
       </div>
     </div>
+  );
+};
+
+const StatusBadge = ({ label, status }) => {
+  const colors = {
+    up: {
+      background: 'var(--success-100)',
+      color: 'var(--success-700)',
+      border: 'var(--success-200)',
+      dot: 'var(--success-500)',
+    },
+    down: {
+      background: 'var(--error-100)',
+      color: 'var(--error-700)',
+      border: 'var(--error-200)',
+      dot: 'var(--error-500)',
+    },
+    unknown: {
+      background: 'var(--gray-100)',
+      color: 'var(--gray-700)',
+      border: 'var(--gray-300)',
+      dot: 'var(--gray-500)',
+    },
+  };
+
+  const current = colors[status] || colors.unknown;
+
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '8px',
+        padding: '6px 10px',
+        borderRadius: '999px',
+        border: `1px solid ${current.border}`,
+        background: current.background,
+        color: current.color,
+        fontSize: '0.8rem',
+        fontWeight: 600,
+      }}
+    >
+      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: current.dot }} />
+      {label}: {status.toUpperCase()}
+    </span>
   );
 };
 

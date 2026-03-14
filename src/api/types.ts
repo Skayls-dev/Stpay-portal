@@ -1,69 +1,54 @@
-// Types générés pour l'API ST Pay
+import type {
+  CustomerInfo as GeneratedCustomerInfo,
+  MerchantInfo as GeneratedMerchantInfo,
+  PaymentRequest as GeneratedPaymentRequest,
+  RefundRequest as GeneratedRefundRequest,
+  WebhookListResponse,
+  WebhookReplayResponse,
+  WebhookSummary,
+} from './types.gen';
 
-export interface PaymentRequest {
-  amount: number;
-  currency: string;
-  provider: 'MTN' | 'ORANGE' | 'MOOV' | 'WAVE';
-  customer: CustomerInfo;
-  merchant: MerchantInfo;
-  description?: string;
-  metadata?: Record<string, any>;
-  merchantApiKey?: string;
-}
+export type PaymentRequest = GeneratedPaymentRequest;
+export type RefundRequest = GeneratedRefundRequest;
+export type CustomerInfo = GeneratedCustomerInfo & { phone?: string | null };
+export type MerchantInfo = GeneratedMerchantInfo & { id?: string | null };
 
 export interface PaymentResponse {
-  transactionId: string;
-  status: string;
-  amount: number;
-  currency: string;
-  provider: string;
+  transactionId?: string;
+  id?: string;
+  status?: string;
+  amount?: number;
+  currency?: string;
+  provider?: string;
   providerTransactionId?: string;
   paymentUrl?: string;
-  createdAt: string;
+  message?: string;
+  customerName?: string;
+  phoneNumber?: string;
+  createdAt?: string;
+  [key: string]: unknown;
 }
 
-export interface PaymentStatusResponse {
-  transactionId: string;
-  status: string;
-  amount: number;
-  currency: string;
-  provider: string;
-  providerTransactionId?: string;
-  paymentUrl?: string;
+export interface PaymentStatusResponse extends PaymentResponse {
   description?: string;
-  customer: CustomerInfo;
-  merchant: MerchantInfo;
+  customer?: CustomerInfo;
+  merchant?: MerchantInfo;
   errorMessage?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CustomerInfo {
-  name?: string;
-  email?: string;
-  phoneNumber: string;  // Correspond au backend: PhoneNumber
-}
-
-export interface MerchantInfo {
-  name?: string;
-  reference: string;  // Correspond au backend: Reference
-  callbackUrl?: string;  // Correspond au backend: CallbackUrl
-}
-
-export interface ErrorResponse {
-  Error: string;
-  Code?: string;
-}
-
-// Types pour les réponses d'API
-export interface ApiResponse<T> {
-  data: T;
-  status: number;
-  statusText: string;
+  updatedAt?: string;
 }
 
 export interface ApiError {
-  Error: string;
+  Error?: string;
   Code?: string;
+  title?: string;
+  detail?: string;
+  message?: string;
   status?: number;
+  [key: string]: unknown;
 }
+
+export type {
+  WebhookListResponse,
+  WebhookReplayResponse,
+  WebhookSummary,
+};

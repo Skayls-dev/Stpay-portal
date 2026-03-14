@@ -44,12 +44,18 @@ const PaymentForm = () => {
           amount: parseFloat(formData.amount),
           currency: formData.currency,
           provider: formData.provider,
-          phoneNumber: formatters.formatPhoneNumber(formData.phoneNumber),
-          customerName: formData.customerName,
-          customerEmail: formData.customerEmail,
+          customer: {
+            name: formData.customerName,
+            email: formData.customerEmail,
+            phoneNumber: formatters.formatPhoneNumber(formData.phoneNumber)
+          },
+          merchant: {
+            name: 'STPAY Merchant',
+            reference: 'STPAY_MERCHANT',
+            callbackUrl: 'https://skayls.com/api/callbacks/stpay'
+          },
           description: formData.description || 'Payment via ST Pay'
         };
-        
         await processPayment(paymentRequest);
         errorHandler.showSuccess('Payment initiated successfully!');
       } catch (err) {

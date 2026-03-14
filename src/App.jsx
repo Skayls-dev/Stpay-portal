@@ -1,17 +1,21 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import PaymentForm from './components/PaymentForm';
-import PaymentStatus from './components/PaymentStatus';
-import PaymentList from './components/PaymentList';
+import PaymentForm from './features/payment/PaymentForm';
+import PaymentStatus from './features/payment/PaymentStatus';
+import PaymentList from './features/payment/PaymentList';
 import Dashboard from './components/Dashboard';
 import ApiStatus from './components/ApiStatus';
-import TestSDK from './components/TestSDK';
+import ApiPlayground from './components/ApiPlayground';
+import ApiKeyManager from './components/ApiKeyManager';
+import MobilePaymentSimulator from './components/MobilePaymentSimulator';
+import EventsApp from './features/EventsApp';
 import './App.css';
+import './features/events.css';
 
 function App() {
   return (
-    <Router>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <div className="App">
         <Toaster 
           position="top-right" 
@@ -50,6 +54,10 @@ function App() {
             <Route path="/process" element={<PaymentForm />} />
             <Route path="/status" element={<PaymentStatus />} />
             <Route path="/payments" element={<PaymentList />} />
+            <Route path="/events" element={<EventsApp />} />
+            <Route path="/api-playground" element={<ApiPlayground />} />
+            <Route path="/api-keys" element={<ApiKeyManager />} />
+            <Route path="/simulator" element={<MobilePaymentSimulator />} />
           </Routes>
         </main>
 
@@ -88,6 +96,12 @@ function Navigation() {
             💳 Process Payment
           </Link>
           <Link 
+            to="/events" 
+            className={`nav-link ${isActive('/events') ? 'active' : ''}`}
+          >
+            🎪 Events
+          </Link>
+          <Link 
             to="/status" 
             className={`nav-link ${isActive('/status') ? 'active' : ''}`}
           >
@@ -98,6 +112,24 @@ function Navigation() {
             className={`nav-link ${isActive('/payments') ? 'active' : ''}`}
           >
             📋 Payment History
+          </Link>
+          <Link
+            to="/simulator"
+            className={`nav-link ${isActive('/simulator') ? 'active' : ''}`}
+          >
+            📱 Mobile Simulator
+          </Link>
+          <Link
+            to="/api-playground"
+            className={`nav-link ${isActive('/api-playground') ? 'active' : ''}`}
+          >
+            🧪 API Playground
+          </Link>
+          <Link
+            to="/api-keys"
+            className={`nav-link ${isActive('/api-keys') ? 'active' : ''}`}
+          >
+            🔑 API Keys
           </Link>
         </div>
       </div>
