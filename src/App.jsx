@@ -18,26 +18,20 @@ import ProvidersHealth from './pages/ProvidersHealth';
 import Escrow from './pages/Escrow';
 import MerchantProfile from './pages/MerchantProfile';
 import PortalSelect from './pages/PortalSelect';
-
+import DeveloperPortal from './pages/DeveloperPortal';
+import PaymentSimulator from './pages/PaymentSimulator';
 
 function HomeRedirect() {
   const { isAuthenticated, isSuperAdmin } = useAuth();
-
-  if (!isAuthenticated) {
-    return <Navigate to="/choose-portal" replace />;
-  }
-
+  if (!isAuthenticated) return <Navigate to="/choose-portal" replace />;
   return <Navigate to={isSuperAdmin ? '/admin' : '/merchant'} replace />;
 }
 
 function RequireRole({ role, children }) {
   const { user } = useAuth();
-
   if (user.role !== role) {
-    const fallback = user.role === 'super_admin' ? '/admin' : '/merchant';
-    return <Navigate to={fallback} replace />;
+    return <Navigate to={user.role === 'super_admin' ? '/admin' : '/merchant'} replace />;
   }
-
   return children;
 }
 
@@ -49,163 +43,53 @@ function App() {
         toastOptions={{
           duration: 4000,
           style: {
-    background: '#FFFFFF',
-    color: '#1A1A1A',
-    border: '1px solid #E2E0D8',
-    borderRadius: '10px',
-    fontSize: '13px',
-    fontWeight: '600',
-    fontFamily: "'Plus Jakarta Sans', sans-serif",
-    boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-    },
-    success: { iconTheme: { primary: '#1A7A40', secondary: '#E8F7EE' } },
-    error:   { iconTheme: { primary: '#C02020', secondary: '#FEE8E8' } },
+            background: '#FFFFFF',
+            color: '#1A1A1A',
+            border: '1px solid #E2E0D8',
+            borderRadius: '10px',
+            fontSize: '13px',
+            fontWeight: '600',
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+          },
+          success: { iconTheme: { primary: '#1A7A40', secondary: '#E8F7EE' } },
+          error:   { iconTheme: { primary: '#C02020', secondary: '#FEE8E8' } },
         }}
       />
       <Routes>
-        {/* Public */}
-        <Route path="/login" element={<Navigate to="/choose-portal" replace />} />
-        <Route path="/choose-portal" element={<PortalSelect />} />
+        <Route path="/login"          element={<Navigate to="/choose-portal" replace />} />
+        <Route path="/choose-portal"  element={<PortalSelect />} />
         <Route path="/merchant/login" element={<Login portal="merchant" />} />
-        <Route path="/admin/login" element={<Login portal="admin" />} />
-        <Route path="/register" element={<MerchantRegister />} />
-
-        {/* Root */}
+        <Route path="/admin/login"    element={<Login portal="admin" />} />
+        <Route path="/register"       element={<MerchantRegister />} />
         <Route path="/" element={<HomeRedirect />} />
 
-        {/* Admin area */}
-        <Route
-          path="/admin"
-          element={
-            <RequireAuth>
-              <RequireRole role="super_admin">
-                <DashboardLayout />
-              </RequireRole>
-            </RequireAuth>
-          }
-        >
+        <Route path="/admin" element={<RequireAuth><RequireRole role="super_admin"><DashboardLayout /></RequireRole></RequireAuth>}>
           <Route index element={<Overview />} />
-          <Route
-            path="transactions"
-            element={
-              <RequirePermission permission={['transactions.view_own', 'transactions.view_all']}>
-                <Transactions />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="merchants"
-            element={
-              <RequirePermission permission="merchants.view_all">
-                <Merchants />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="webhooks"
-            element={
-              <RequirePermission permission={['webhooks.view_own', 'webhooks.view_all']}>
-                <Webhooks />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="analytics"
-            element={
-              <RequirePermission permission={['analytics.view_own', 'analytics.view_all']}>
-                <Analytics />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="providers"
-            element={
-              <RequirePermission permission="providers.view_health">
-                <ProvidersHealth />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="escrow"
-            element={
-              <RequirePermission permission={['escrow.view_own', 'escrow.release_manual']}>
-                <Escrow />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="profile"
-            element={
-              <RequirePermission permission="merchants.view_own">
-                <MerchantProfile />
-              </RequirePermission>
-            }
-          />
+          <Route path="transactions" element={<RequirePermission permission={['transactions.view_own','transactions.view_all']}><Transactions /></RequirePermission>} />
+          <Route path="merchants"    element={<RequirePermission permission="merchants.view_all"><Merchants /></RequirePermission>} />
+          <Route path="webhooks"     element={<RequirePermission permission={['webhooks.view_own','webhooks.view_all']}><Webhooks /></RequirePermission>} />
+          <Route path="analytics"    element={<RequirePermission permission={['analytics.view_own','analytics.view_all']}><Analytics /></RequirePermission>} />
+          <Route path="providers"    element={<RequirePermission permission="providers.view_health"><ProvidersHealth /></RequirePermission>} />
+          <Route path="escrow"       element={<RequirePermission permission={['escrow.view_own','escrow.release_manual']}><Escrow /></RequirePermission>} />
+          <Route path="profile"      element={<RequirePermission permission="merchants.view_own"><MerchantProfile /></RequirePermission>} />
+          <Route path="developer"    element={<RequirePermission permission="merchants.view_own"><DeveloperPortal /></RequirePermission>} />
+          <Route path="simulator"    element={<RequirePermission permission="merchants.view_own"><PaymentSimulator /></RequirePermission>} />
         </Route>
 
-        {/* Merchant area */}
-        <Route
-          path="/merchant"
-          element={
-            <RequireAuth>
-              <RequireRole role="merchant">
-                <DashboardLayout />
-              </RequireRole>
-            </RequireAuth>
-          }
-        >
+        <Route path="/merchant" element={<RequireAuth><RequireRole role="merchant"><DashboardLayout /></RequireRole></RequireAuth>}>
           <Route index element={<Overview />} />
-          <Route
-            path="transactions"
-            element={
-              <RequirePermission permission={['transactions.view_own', 'transactions.view_all']}>
-                <Transactions />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="webhooks"
-            element={
-              <RequirePermission permission={['webhooks.view_own', 'webhooks.view_all']}>
-                <Webhooks />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="analytics"
-            element={
-              <RequirePermission permission={['analytics.view_own', 'analytics.view_all']}>
-                <Analytics />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="providers"
-            element={
-              <RequirePermission permission="providers.view_health">
-                <ProvidersHealth />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="escrow"
-            element={
-              <RequirePermission permission={['escrow.view_own', 'escrow.release_manual']}>
-                <Escrow />
-              </RequirePermission>
-            }
-          />
-          <Route
-            path="profile"
-            element={
-              <RequirePermission permission="merchants.view_own">
-                <MerchantProfile />
-              </RequirePermission>
-            }
-          />
+          <Route path="transactions" element={<RequirePermission permission={['transactions.view_own','transactions.view_all']}><Transactions /></RequirePermission>} />
+          <Route path="webhooks"     element={<RequirePermission permission={['webhooks.view_own','webhooks.view_all']}><Webhooks /></RequirePermission>} />
+          <Route path="analytics"    element={<RequirePermission permission={['analytics.view_own','analytics.view_all']}><Analytics /></RequirePermission>} />
+          <Route path="providers"    element={<RequirePermission permission="providers.view_health"><ProvidersHealth /></RequirePermission>} />
+          <Route path="escrow"       element={<RequirePermission permission={['escrow.view_own','escrow.release_manual']}><Escrow /></RequirePermission>} />
+          <Route path="profile"      element={<RequirePermission permission="merchants.view_own"><MerchantProfile /></RequirePermission>} />
+          <Route path="developer"    element={<RequirePermission permission="merchants.view_own_keys"><DeveloperPortal /></RequirePermission>} />
+          <Route path="simulator"    element={<RequirePermission permission="merchants.view_own_keys"><PaymentSimulator /></RequirePermission>} />
+
         </Route>
 
-        {/* Catch-all */}
         <Route path="*" element={<HomeRedirect />} />
       </Routes>
     </Router>

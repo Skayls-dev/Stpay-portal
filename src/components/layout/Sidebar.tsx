@@ -8,6 +8,15 @@ import {
   IconUser, IconHealth, IconProfile, IconLogout,
 } from '../icons/NavIcons'
 
+function IconDev({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <path d="M4.5 4.5L2 7l2.5 2.5M9.5 4.5L12 7l-2.5 2.5M7.5 3l-1 8"
+            stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
 interface NavItem {
   to: string; label: string; icon: React.ReactNode
   badge?: { text: string; variant: 'red' | 'green' | 'amber' }; end?: boolean
@@ -28,8 +37,7 @@ function NavBadge({ text, variant }: { text: string; variant: 'red' | 'green' | 
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="px-2.5 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.7px]
-                  text-[var(--text-4)]">
+    <p className="px-2.5 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.7px] text-[var(--text-4)]">
       {children}
     </p>
   )
@@ -51,25 +59,23 @@ export default function Sidebar() {
       label: 'Principal',
       items: [
         { to: basePath, label: "Vue d'ensemble", icon: <IconGrid />, end: true },
-        { to: `${basePath}/transactions`, label: 'Transactions', icon: <IconList />,
-          badge: { text: '247', variant: 'green' as const } },
+        { to: `${basePath}/transactions`, label: 'Transactions', icon: <IconList />, badge: { text: '247', variant: 'green' as const } },
       ],
     },
     {
       label: 'Finance',
       items: [
-        { to: `${basePath}/escrow`, label: 'Escrow', icon: <IconCard />,
-          badge: { text: '3', variant: 'amber' as const } },
+        { to: `${basePath}/escrow`,    label: 'Escrow',    icon: <IconCard />, badge: { text: '3', variant: 'amber' as const } },
         { to: `${basePath}/analytics`, label: 'Analytics', icon: <IconChart /> },
       ],
     },
     {
       label: 'Configuration',
       items: [
-        { to: `${basePath}/webhooks`, label: 'Webhooks', icon: <IconWebhook />,
-          badge: { text: '2', variant: 'red' as const } },
-        { to: `${basePath}/merchants`, label: 'Marchands', icon: <IconUser /> },
-        { to: `${basePath}/providers`, label: 'Santé API', icon: <IconHealth /> },
+        { to: `${basePath}/webhooks`,   label: 'Webhooks',   icon: <IconWebhook />, badge: { text: '2', variant: 'red' as const } },
+        { to: `${basePath}/merchants`,  label: 'Marchands',  icon: <IconUser /> },
+        { to: `${basePath}/providers`,  label: 'Santé API',  icon: <IconHealth /> },
+        { to: `${basePath}/developer`,  label: 'Developer',  icon: <IconDev /> },
       ],
     },
   ]
@@ -88,7 +94,13 @@ export default function Sidebar() {
         { to: `${basePath}/escrow`,    label: 'Escrow',    icon: <IconCard /> },
         { to: `${basePath}/analytics`, label: 'Analytics', icon: <IconChart /> },
         { to: `${basePath}/webhooks`,  label: 'Webhooks',  icon: <IconWebhook /> },
-        { to: `${basePath}/profile`,   label: 'Mon profil',icon: <IconProfile /> },
+      ],
+    },
+    {
+      label: 'Développeur',
+      items: [
+        { to: `${basePath}/developer`, label: 'Developer Portal', icon: <IconDev /> },
+        { to: `${basePath}/profile`,   label: 'Mon profil',       icon: <IconProfile /> },
       ],
     },
   ]
@@ -106,7 +118,6 @@ export default function Sidebar() {
     <aside className="flex flex-col w-[210px] min-w-[210px] bg-[var(--bg-card)]
                       border-r border-[var(--border)] h-full select-none">
 
-      {/* Logo */}
       <div className="px-4 py-[18px] border-b border-[var(--border-soft)]">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-[8px] flex items-center justify-center
@@ -115,30 +126,18 @@ export default function Sidebar() {
             ST
           </div>
           <div>
-            <p className="font-extrabold text-[14px] text-[var(--text-1)] leading-none tracking-tight">
-              ST Pay
-            </p>
-            <p className="text-[10px] text-[var(--text-4)] mt-0.5 tracking-wide">
-              Payment Gateway
-            </p>
+            <p className="font-extrabold text-[14px] text-[var(--text-1)] leading-none tracking-tight">ST Pay</p>
+            <p className="text-[10px] text-[var(--text-4)] mt-0.5 tracking-wide">Payment Gateway</p>
           </div>
         </div>
-
-        {/* Env pill */}
         <div className="mt-2.5 inline-flex items-center gap-1.5 px-2 py-[3px] rounded-full
                         text-[10px] font-semibold font-mono border"
-             style={{
-               background: 'var(--orange-bg)',
-               borderColor: 'var(--orange-border)',
-               color: 'var(--orange-dark)',
-             }}>
-          <span className="w-1.5 h-1.5 rounded-full animate-pulse-slow"
-                style={{ background: 'var(--orange)' }} />
+             style={{ background: 'var(--orange-bg)', borderColor: 'var(--orange-border)', color: 'var(--orange-dark)' }}>
+          <span className="w-1.5 h-1.5 rounded-full animate-pulse-slow" style={{ background: 'var(--orange)' }} />
           LIVE
         </div>
       </div>
 
-      {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-2 py-1">
         {sections.map((section) => (
           <div key={section.label}>
@@ -150,23 +149,18 @@ export default function Sidebar() {
                 end={item.end}
                 className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
               >
-                <span className="w-[14px] h-[14px] flex-shrink-0 opacity-60
-                                  [.active_&]:opacity-100">
+                <span className="w-[14px] h-[14px] flex-shrink-0 opacity-60 [.active_&]:opacity-100">
                   {item.icon}
                 </span>
                 {item.label}
-                {item.badge && (
-                  <NavBadge text={item.badge.text} variant={item.badge.variant} />
-                )}
+                {item.badge && <NavBadge text={item.badge.text} variant={item.badge.variant} />}
               </NavLink>
             ))}
           </div>
         ))}
       </nav>
 
-      {/* Footer */}
       <div className="px-2 pb-3 border-t border-[var(--border-soft)] pt-3 space-y-1">
-        {/* Backend status */}
         <div className="flex items-center gap-2 px-2.5 py-1.5">
           <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 animate-pulse-slow
             ${health?.connected ? 'bg-[var(--green)]' : 'bg-[var(--red)]'}`} />
@@ -174,14 +168,9 @@ export default function Sidebar() {
             {health?.connected ? 'Backend connecté' : 'Backend hors ligne'}
           </span>
         </div>
-
-        {/* User */}
-        <div
-          onClick={handleLogout}
-          title="Se déconnecter"
-          className="flex items-center gap-2.5 px-2.5 py-2 rounded-[7px] cursor-pointer
-                     transition-colors hover:bg-[var(--bg-hover)] group"
-        >
+        <div onClick={handleLogout} title="Se déconnecter"
+             className="flex items-center gap-2.5 px-2.5 py-2 rounded-[7px] cursor-pointer
+                        transition-colors hover:bg-[var(--bg-hover)] group">
           <div className="w-[28px] h-[28px] rounded-full flex items-center justify-center
                           flex-shrink-0 text-[11px] font-bold text-white"
                style={{ background: 'var(--orange)' }}>
@@ -195,8 +184,7 @@ export default function Sidebar() {
               {isSuperAdmin ? 'Super Admin' : 'Marchand'}
             </p>
           </div>
-          <IconLogout className="text-[var(--text-4)] group-hover:text-[var(--text-2)]
-                                  transition-colors flex-shrink-0" />
+          <IconLogout className="text-[var(--text-4)] group-hover:text-[var(--text-2)] transition-colors flex-shrink-0" />
         </div>
       </div>
     </aside>

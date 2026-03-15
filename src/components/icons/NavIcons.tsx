@@ -3,6 +3,15 @@ import React from 'react'
 
 type P = { className?: string }
 
+export function IconSim({ className }: P) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <rect x="3" y="1" width="8" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
+      <path d="M5 3h4M5 10h4M6.5 8l1.5-1.5L6.5 5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
 export function IconGrid({ className }: P) {
   return (
     <svg className={className} width="14" height="14" viewBox="0 0 14 14" fill="none">

@@ -1,5 +1,11 @@
 import axios from 'axios'
 
+export type ApiClientError = Error & {
+  status?: number
+  data?: unknown
+  url?: string
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE || 'http://localhost:5169'
 
 const client = axios.create({
@@ -47,7 +53,11 @@ client.interceptors.response.use(
       window.location.href = '/choose-portal'
     }
     const message = error?.response?.data?.message || error?.response?.data?.Error || error?.message || 'Erreur API'
-    return Promise.reject(new Error(message))
+    const apiError = new Error(message) as ApiClientError
+    apiError.status = error?.response?.status
+    apiError.data = error?.response?.data
+    apiError.url = requestUrl
+    return Promise.reject(apiError)
   },
 )
 
