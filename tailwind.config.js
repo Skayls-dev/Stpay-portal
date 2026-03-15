@@ -4,43 +4,30 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans:    ['DM Sans', 'system-ui', 'sans-serif'],
-        display: ['Syne', 'sans-serif'],
+        sans:    ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
         mono:    ['DM Mono', 'monospace'],
       },
       colors: {
-        /* ── base surfaces ── */
-        'st-base':    '#0E0F14',
-        'st-raised':  '#13151C',
-        'st-overlay': '#1A1D27',
-        'st-subtle':  '#21253A',
-
-        /* ── brand gold ── */
-        'st-gold':       '#F5A623',
-        'st-gold-bright':'#FFCF6B',
-
-        /* ── semantic ── */
-        'st-green':  '#22C55E',
-        'st-red':    '#EF4444',
-        'st-amber':  '#F59E0B',
-        'st-blue':   '#3B82F6',
-
-        /* ── text ── */
-        'st-text':   '#F0F1F5',
-        'st-text-2': '#8A8EA6',
-        'st-text-3': '#5A5E78',
-      },
-      borderColor: {
-        'st-soft':   'rgba(255,255,255,0.07)',
-        'st-medium': 'rgba(255,255,255,0.12)',
+        'sp-page':   '#F5F4F0',
+        'sp-card':   '#FFFFFF',
+        'sp-subtle': '#FAFAF8',
+        'sp-hover':  '#F5F4F0',
+        'sp-orange': '#FF6600',
+        'sp-orange-dark': '#E55A00',
+        'sp-text-1': '#1A1A1A',
+        'sp-text-2': '#6B6860',
+        'sp-text-3': '#9E9B91',
+        'sp-text-4': '#C0BDB4',
+        'sp-border': '#EBEBEB',
+        'sp-green':  '#1A7A40',
+        'sp-red':    '#C02020',
+        'sp-amber':  '#954A00',
+        'sp-blue':   '#1A5FA5',
       },
       borderRadius: {
-        'st-sm': '6px',
-        'st-md': '10px',
-        'st-lg': '14px',
-      },
-      animation: {
-        'pulse-slow': 'pulse 2s ease-in-out infinite',
+        'sp-sm': '6px',
+        'sp-md': '10px',
+        'sp-lg': '14px',
       },
     },
   },

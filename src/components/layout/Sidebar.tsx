@@ -5,29 +5,22 @@ import { useAuth } from '../../hooks/useAuth'
 import { healthApi } from '../../lib/api/modules'
 import {
   IconGrid, IconList, IconCard, IconChart, IconWebhook,
-  IconUser, IconHealth, IconProfile, IconChevronDown, IconLogout,
+  IconUser, IconHealth, IconProfile, IconLogout,
 } from '../icons/NavIcons'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 interface NavItem {
-  to: string
-  label: string
-  icon: React.ReactNode
-  badge?: { text: string; variant: 'red' | 'green' | 'amber' }
-  end?: boolean
+  to: string; label: string; icon: React.ReactNode
+  badge?: { text: string; variant: 'red' | 'green' | 'amber' }; end?: boolean
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
 function NavBadge({ text, variant }: { text: string; variant: 'red' | 'green' | 'amber' }) {
-  const styles = {
+  const s = {
     red:   'bg-[var(--red-bg)]   text-[var(--red)]',
     green: 'bg-[var(--green-bg)] text-[var(--green)]',
     amber: 'bg-[var(--amber-bg)] text-[var(--amber)]',
   }
   return (
-    <span className={`ml-auto px-1.5 py-px rounded-full text-[10px] font-semibold font-mono ${styles[variant]}`}>
+    <span className={`ml-auto px-1.5 py-px rounded-full text-[10px] font-semibold font-mono ${s[variant]}`}>
       {text}
     </span>
   )
@@ -35,23 +28,12 @@ function NavBadge({ text, variant }: { text: string; variant: 'red' | 'green' | 
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="px-2 pt-3 pb-1 text-[10px] font-medium uppercase tracking-[0.7px] text-[var(--text-muted)]">
+    <p className="px-2.5 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.7px]
+                  text-[var(--text-4)]">
       {children}
     </p>
   )
 }
-
-function StatusDot({ connected }: { connected: boolean }) {
-  return (
-    <span
-      title={`Backend ST Pay : ${connected ? 'connecté' : 'déconnecté'}`}
-      className={`w-2 h-2 rounded-full flex-shrink-0 animate-pulse-slow
-        ${connected ? 'bg-[var(--green)]' : 'bg-[var(--red)]'}`}
-    />
-  )
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function Sidebar() {
   const { user, logout, isSuperAdmin } = useAuth()
@@ -64,97 +46,100 @@ export default function Sidebar() {
     refetchInterval: 15_000,
   })
 
-  const adminNav: NavItem[] = [
-    { to: `${basePath}`, label: 'Vue d\'ensemble', icon: <IconGrid />, end: true },
-    { to: `${basePath}/transactions`, label: 'Transactions', icon: <IconList />, badge: { text: '247', variant: 'green' } },
+  const adminSections = [
+    {
+      label: 'Principal',
+      items: [
+        { to: basePath, label: "Vue d'ensemble", icon: <IconGrid />, end: true },
+        { to: `${basePath}/transactions`, label: 'Transactions', icon: <IconList />,
+          badge: { text: '247', variant: 'green' as const } },
+      ],
+    },
+    {
+      label: 'Finance',
+      items: [
+        { to: `${basePath}/escrow`, label: 'Escrow', icon: <IconCard />,
+          badge: { text: '3', variant: 'amber' as const } },
+        { to: `${basePath}/analytics`, label: 'Analytics', icon: <IconChart /> },
+      ],
+    },
+    {
+      label: 'Configuration',
+      items: [
+        { to: `${basePath}/webhooks`, label: 'Webhooks', icon: <IconWebhook />,
+          badge: { text: '2', variant: 'red' as const } },
+        { to: `${basePath}/merchants`, label: 'Marchands', icon: <IconUser /> },
+        { to: `${basePath}/providers`, label: 'Santé API', icon: <IconHealth /> },
+      ],
+    },
   ]
 
-  const adminFinance: NavItem[] = [
-    { to: `${basePath}/escrow`, label: 'Escrow', icon: <IconCard />, badge: { text: '3', variant: 'amber' } },
-    { to: `${basePath}/analytics`, label: 'Analytics', icon: <IconChart /> },
+  const merchantSections = [
+    {
+      label: 'Principal',
+      items: [
+        { to: basePath, label: "Vue d'ensemble", icon: <IconGrid />, end: true },
+        { to: `${basePath}/transactions`, label: 'Transactions', icon: <IconList /> },
+      ],
+    },
+    {
+      label: 'Outils',
+      items: [
+        { to: `${basePath}/escrow`,    label: 'Escrow',    icon: <IconCard /> },
+        { to: `${basePath}/analytics`, label: 'Analytics', icon: <IconChart /> },
+        { to: `${basePath}/webhooks`,  label: 'Webhooks',  icon: <IconWebhook /> },
+        { to: `${basePath}/profile`,   label: 'Mon profil',icon: <IconProfile /> },
+      ],
+    },
   ]
 
-  const adminConfig: NavItem[] = [
-    { to: `${basePath}/webhooks`, label: 'Webhooks', icon: <IconWebhook />, badge: { text: '2', variant: 'red' } },
-    { to: `${basePath}/merchants`, label: 'Marchands', icon: <IconUser /> },
-    { to: `${basePath}/providers`, label: 'Santé API', icon: <IconHealth /> },
-  ]
-
-  const merchantNav: NavItem[] = [
-    { to: `${basePath}`, label: 'Vue d\'ensemble', icon: <IconGrid />, end: true },
-    { to: `${basePath}/transactions`, label: 'Transactions', icon: <IconList /> },
-  ]
-
-  const merchantConfig: NavItem[] = [
-    { to: `${basePath}/escrow`, label: 'Escrow', icon: <IconCard /> },
-    { to: `${basePath}/analytics`, label: 'Analytics', icon: <IconChart /> },
-    { to: `${basePath}/webhooks`, label: 'Webhooks', icon: <IconWebhook /> },
-    { to: `${basePath}/profile`, label: 'Mon profil', icon: <IconProfile /> },
-  ]
-
-  const sections = isSuperAdmin
-    ? [
-        { label: 'Principal', items: adminNav },
-        { label: 'Finance', items: adminFinance },
-        { label: 'Configuration', items: adminConfig },
-      ]
-    : [
-        { label: 'Principal', items: merchantNav },
-        { label: 'Outils', items: merchantConfig },
-      ]
+  const sections = isSuperAdmin ? adminSections : merchantSections
+  const initials = (user.name || user.email || 'U')
+    .split(' ').map((w: string) => w[0]?.toUpperCase()).slice(0, 2).join('')
 
   const handleLogout = () => {
-    const loginPath = isSuperAdmin ? '/admin/login' : '/merchant/login'
     logout()
-    navigate(loginPath, { replace: true })
+    navigate(isSuperAdmin ? '/admin/login' : '/merchant/login', { replace: true })
   }
 
-  // Initials avatar
-  const initials = (user.name || user.email || 'U')
-    .split(' ')
-    .map((w: string) => w[0]?.toUpperCase())
-    .slice(0, 2)
-    .join('')
-
   return (
-    <aside className="flex flex-col w-[220px] min-w-[220px] bg-[var(--bg-raised)]
-                      border-r border-[var(--border-soft)] h-full select-none">
+    <aside className="flex flex-col w-[210px] min-w-[210px] bg-[var(--bg-card)]
+                      border-r border-[var(--border)] h-full select-none">
 
-      {/* ── Logo zone ── */}
-      <div className="px-4 py-5 border-b border-[var(--border-soft)]">
+      {/* Logo */}
+      <div className="px-4 py-[18px] border-b border-[var(--border-soft)]">
         <div className="flex items-center gap-2.5">
-          {/* Logo mark */}
-          <div className="w-[34px] h-[34px] rounded-[8px] flex items-center justify-center
-                          text-[#0E0F14] font-display font-extrabold text-[13px] tracking-tight
-                          flex-shrink-0"
-               style={{ background: 'linear-gradient(135deg, #F5A623, #E8890A)' }}>
+          <div className="w-8 h-8 rounded-[8px] flex items-center justify-center
+                          text-white font-extrabold text-[12px] flex-shrink-0"
+               style={{ background: 'var(--orange)' }}>
             ST
           </div>
           <div>
-            <p className="font-display font-bold text-[15px] text-[var(--text-primary)] leading-none tracking-tight">
+            <p className="font-extrabold text-[14px] text-[var(--text-1)] leading-none tracking-tight">
               ST Pay
             </p>
-            <p className="text-[10px] text-[var(--text-muted)] mt-0.5 tracking-wide">
+            <p className="text-[10px] text-[var(--text-4)] mt-0.5 tracking-wide">
               Payment Gateway
             </p>
           </div>
         </div>
 
-        {/* Environment pill */}
-        <div className="mt-3 inline-flex items-center gap-1.5 px-2 py-1 rounded-full
-                        border text-[10px] font-medium font-mono"
+        {/* Env pill */}
+        <div className="mt-2.5 inline-flex items-center gap-1.5 px-2 py-[3px] rounded-full
+                        text-[10px] font-semibold font-mono border"
              style={{
-               background: 'var(--gold-bg)',
-               borderColor: 'var(--gold-border)',
-               color: 'var(--gold)',
+               background: 'var(--orange-bg)',
+               borderColor: 'var(--orange-border)',
+               color: 'var(--orange-dark)',
              }}>
-          <span className="w-1.5 h-1.5 rounded-full bg-[var(--gold)] animate-pulse-slow" />
+          <span className="w-1.5 h-1.5 rounded-full animate-pulse-slow"
+                style={{ background: 'var(--orange)' }} />
           LIVE
         </div>
       </div>
 
-      {/* ── Nav ── */}
-      <nav className="flex-1 overflow-y-auto px-2 py-2">
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto px-2 py-1">
         {sections.map((section) => (
           <div key={section.label}>
             <SectionLabel>{section.label}</SectionLabel>
@@ -163,11 +148,10 @@ export default function Sidebar() {
                 key={item.to}
                 to={item.to}
                 end={item.end}
-                className={({ isActive }) =>
-                  `nav-item ${isActive ? 'active' : ''}`
-                }
+                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
               >
-                <span className="w-4 h-4 flex-shrink-0 opacity-70 [.active_&]:opacity-100">
+                <span className="w-[14px] h-[14px] flex-shrink-0 opacity-60
+                                  [.active_&]:opacity-100">
                   {item.icon}
                 </span>
                 {item.label}
@@ -180,40 +164,38 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* ── Footer: backend status + user ── */}
+      {/* Footer */}
       <div className="px-2 pb-3 border-t border-[var(--border-soft)] pt-3 space-y-1">
         {/* Backend status */}
-        <div className="flex items-center gap-2 px-2.5 py-2 rounded-md">
-          <StatusDot connected={Boolean(health?.connected)} />
-          <span className="text-[11px] text-[var(--text-muted)]">
+        <div className="flex items-center gap-2 px-2.5 py-1.5">
+          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 animate-pulse-slow
+            ${health?.connected ? 'bg-[var(--green)]' : 'bg-[var(--red)]'}`} />
+          <span className="text-[11px] text-[var(--text-3)]">
             {health?.connected ? 'Backend connecté' : 'Backend hors ligne'}
           </span>
         </div>
 
-        {/* User card */}
+        {/* User */}
         <div
-          className="flex items-center gap-2.5 px-2.5 py-2 rounded-md cursor-pointer
-                     transition-colors hover:bg-[var(--bg-overlay)] group"
           onClick={handleLogout}
           title="Se déconnecter"
+          className="flex items-center gap-2.5 px-2.5 py-2 rounded-[7px] cursor-pointer
+                     transition-colors hover:bg-[var(--bg-hover)] group"
         >
-          {/* Avatar */}
-          <div className="w-[30px] h-[30px] rounded-full flex items-center justify-center
-                          flex-shrink-0 text-[11px] font-semibold text-white"
-               style={{ background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)' }}>
+          <div className="w-[28px] h-[28px] rounded-full flex items-center justify-center
+                          flex-shrink-0 text-[11px] font-bold text-white"
+               style={{ background: 'var(--orange)' }}>
             {initials}
           </div>
-
           <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-medium text-[var(--text-primary)] truncate leading-none">
+            <p className="text-[12px] font-semibold text-[var(--text-1)] truncate leading-none">
               {user.name || 'Utilisateur'}
             </p>
-            <p className="text-[10px] text-[var(--text-muted)] mt-0.5 truncate">
+            <p className="text-[10px] text-[var(--text-3)] mt-0.5">
               {isSuperAdmin ? 'Super Admin' : 'Marchand'}
             </p>
           </div>
-
-          <IconLogout className="text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]
+          <IconLogout className="text-[var(--text-4)] group-hover:text-[var(--text-2)]
                                   transition-colors flex-shrink-0" />
         </div>
       </div>

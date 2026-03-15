@@ -1,3 +1,4 @@
+// src/pages/MerchantRegister.tsx
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
@@ -13,209 +14,294 @@ interface RegisterForm {
   isTestMode: 'true' | 'false'
 }
 
+// ─── Field wrapper ────────────────────────────────────────────────────────────
+
+function Field({ label, error, children }: {
+  label: string
+  error?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div>
+      <label className="block mb-1.5 text-[12px] font-medium text-[var(--text-secondary)]">
+        {label}
+      </label>
+      {children}
+      {error && <p className="mt-1 text-[11px] text-[var(--red)]">{error}</p>}
+    </div>
+  )
+}
+
+const INPUT_CLS = (hasError: boolean) =>
+  `w-full rounded-[var(--radius-sm)] border px-3.5 py-2.5 text-[13px]
+   bg-[var(--bg-overlay)] text-[var(--text-primary)]
+   placeholder:text-[var(--text-muted)] outline-none transition
+   focus:ring-1 focus:ring-[var(--gold)]/30
+   ${hasError
+     ? 'border-[var(--red)] bg-[var(--red-bg)]'
+     : 'border-[var(--border-medium)] focus:border-[var(--gold)]'}`
+
+// ─── Success state ────────────────────────────────────────────────────────────
+
+function SuccessView({ result, onLogin }: {
+  result: MerchantRegisterResponse
+  onLogin: () => void
+}) {
+  return (
+    <div className="space-y-4">
+      {/* Banner */}
+      <div className="flex items-start gap-3 p-4 rounded-[var(--radius-md)]
+                      bg-[var(--green-bg)] border border-[rgba(34,197,94,0.2)]">
+        <div className="w-5 h-5 rounded-full bg-[var(--green)] flex items-center justify-center flex-shrink-0 mt-0.5">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M1.5 5.5L3.5 7.5L8.5 2.5" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+        <p className="text-[13px] text-[var(--green)] font-medium">
+          Compte marchand créé avec succès !
+        </p>
+      </div>
+
+      {/* Credentials */}
+      {[
+        { label: 'Marchand ID', value: result.merchantId, mono: true },
+        { label: 'Nom',         value: result.merchantName },
+        { label: 'Email',       value: result.email },
+      ].map(({ label, value, mono }) => (
+        <div key={label}
+             className="rounded-[var(--radius-sm)] border border-[var(--border-soft)]
+                        bg-[var(--bg-overlay)] px-4 py-3">
+          <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)] mb-1">{label}</p>
+          <p className={`text-[13px] text-[var(--text-primary)] break-all
+                         ${mono ? 'font-mono' : ''}`}>
+            {value}
+          </p>
+        </div>
+      ))}
+
+      {/* Warning */}
+      <div className="flex items-start gap-2.5 p-3 rounded-[var(--radius-sm)]
+                      bg-[var(--amber-bg)] border border-[rgba(245,158,11,0.2)]">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0 mt-0.5">
+          <path d="M7 1L13 12H1L7 1Z" stroke="var(--amber)" strokeWidth="1.2" strokeLinejoin="round"/>
+          <path d="M7 5v3M7 9.5v.5" stroke="var(--amber)" strokeWidth="1.2" strokeLinecap="round"/>
+        </svg>
+        <p className="text-[11px] text-[var(--amber)]">
+          Conservez votre Marchand ID en lieu sûr. Il sera nécessaire pour les intégrations API.
+        </p>
+      </div>
+
+      <button
+        onClick={onLogin}
+        className="w-full py-2.5 rounded-[var(--radius-sm)] text-[13px] font-semibold
+                   text-[#0E0F14] bg-[var(--gold)] hover:bg-[var(--gold-bright)]
+                   transition-colors"
+      >
+        Aller à la connexion →
+      </button>
+    </div>
+  )
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 export default function MerchantRegister() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<MerchantRegisterResponse | null>(null)
+  const [result,  setResult]  = useState<MerchantRegisterResponse | null>(null)
 
   const {
-    register,
-    handleSubmit,
+    register, handleSubmit, watch,
     formState: { errors },
-  } = useForm<RegisterForm>({
-    defaultValues: {
-      isTestMode: 'true',
-      webhookUrl: 'http://localhost:3001/webhook-test',
-    },
-  })
+  } = useForm<RegisterForm>({ defaultValues: { isTestMode: 'true' } })
 
   const onSubmit = async (data: RegisterForm) => {
+    if (data.password !== data.confirmPassword) {
+      toast.error('Les mots de passe ne correspondent pas')
+      return
+    }
     setLoading(true)
     try {
-      if (data.password !== data.confirmPassword) {
-        toast.error('Les mots de passe ne correspondent pas')
-        return
-      }
-
-      const response = await authApi.registerMerchant({
-        name: data.name,
-        email: data.email,
-        password: data.password,
+      const res = await authApi.registerMerchant({
+        name:       data.name,
+        email:      data.email,
+        password:   data.password,
         webhookUrl: data.webhookUrl || undefined,
         isTestMode: data.isTestMode === 'true',
       })
-      setResult(response)
-      toast.success('Compte marchand cree avec succes')
+      setResult(res)
+      toast.success('Compte créé avec succès !')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Impossible de creer le compte")
+      toast.error(err instanceof Error ? err.message : 'Impossible de créer le compte')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface px-4 py-8">
-      <div className="w-full max-w-xl rounded-card border border-slate-200 bg-white p-8 shadow-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold text-slate-900">Inscription Marchand</h1>
-          <p className="mt-1 text-sm text-muted">Creez votre compte portail marchand (email/mot de passe)</p>
-        </div>
+    <div className="flex min-h-screen items-center justify-center bg-[var(--bg-base)] px-4 py-10">
+      {/* Ambient glow */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[600px] h-[500px]
+                        rounded-full opacity-[0.03]"
+             style={{ background: 'var(--gold)', filter: 'blur(100px)' }} />
+      </div>
 
-        {!result ? (
-          <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
-            <div>
-              <label htmlFor="name" className="mb-1.5 block text-sm font-medium text-slate-700">
-                Nom du marchand
-              </label>
-              <input
-                id="name"
-                type="text"
-                className={`w-full rounded-lg border px-3.5 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-brand/30 ${
-                  errors.name ? 'border-red-400 bg-red-50' : 'border-slate-300 bg-white focus:border-brand'
-                }`}
-                placeholder="Mon entreprise"
-                {...register('name', {
-                  required: 'Le nom est requis',
-                  minLength: { value: 2, message: 'Minimum 2 caracteres' },
-                  maxLength: { value: 120, message: 'Maximum 120 caracteres' },
-                })}
-              />
-              {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>}
+      <div className="relative w-full max-w-lg">
+        {/* Card */}
+        <div className="bg-[var(--bg-raised)] border border-[var(--border-medium)]
+                        rounded-[var(--radius-lg)] p-8 shadow-2xl">
+
+          {/* Header */}
+          <div className="mb-7 text-center">
+            <div className="mx-auto mb-4 w-[44px] h-[44px] rounded-[10px]
+                            flex items-center justify-center
+                            font-display font-extrabold text-[15px] text-[#0E0F14]"
+                 style={{ background: 'linear-gradient(135deg, #F5A623, #E8890A)' }}>
+              ST
             </div>
-
-            <div>
-              <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-slate-700">
-                Adresse e-mail
-              </label>
-              <input
-                id="email"
-                type="email"
-                className={`w-full rounded-lg border px-3.5 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-brand/30 ${
-                  errors.email ? 'border-red-400 bg-red-50' : 'border-slate-300 bg-white focus:border-brand'
-                }`}
-                placeholder="merchant@stpay.local"
-                {...register('email', {
-                  required: "L'email est requis",
-                  pattern: {
-                    value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                    message: 'Adresse e-mail invalide',
-                  },
-                })}
-              />
-              {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>}
-            </div>
-
-            <div>
-              <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-slate-700">
-                Mot de passe
-              </label>
-              <input
-                id="password"
-                type="password"
-                className={`w-full rounded-lg border px-3.5 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-brand/30 ${
-                  errors.password ? 'border-red-400 bg-red-50' : 'border-slate-300 bg-white focus:border-brand'
-                }`}
-                placeholder="Minimum 8 caracteres"
-                {...register('password', {
-                  required: 'Le mot de passe est requis',
-                  minLength: { value: 8, message: 'Minimum 8 caracteres' },
-                })}
-              />
-              {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>}
-            </div>
-
-            <div>
-              <label htmlFor="confirmPassword" className="mb-1.5 block text-sm font-medium text-slate-700">
-                Confirmer le mot de passe
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                className={`w-full rounded-lg border px-3.5 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-brand/30 ${
-                  errors.confirmPassword ? 'border-red-400 bg-red-50' : 'border-slate-300 bg-white focus:border-brand'
-                }`}
-                placeholder="Retapez le mot de passe"
-                {...register('confirmPassword', {
-                  required: 'Confirmation requise',
-                })}
-              />
-              {errors.confirmPassword && <p className="mt-1 text-xs text-red-600">{errors.confirmPassword.message}</p>}
-            </div>
-
-            <div>
-              <label htmlFor="webhookUrl" className="mb-1.5 block text-sm font-medium text-slate-700">
-                Webhook URL (optionnel)
-              </label>
-              <input
-                id="webhookUrl"
-                type="url"
-                className={`w-full rounded-lg border px-3.5 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-brand/30 ${
-                  errors.webhookUrl ? 'border-red-400 bg-red-50' : 'border-slate-300 bg-white focus:border-brand'
-                }`}
-                placeholder="https://merchant.example.com/webhooks/stpay"
-                {...register('webhookUrl', {
-                  pattern: {
-                    value: /^$|https?:\/\/.+/i,
-                    message: 'URL invalide',
-                  },
-                })}
-              />
-              {errors.webhookUrl && <p className="mt-1 text-xs text-red-600">{errors.webhookUrl.message}</p>}
-            </div>
-
-            <div>
-              <label htmlFor="isTestMode" className="mb-1.5 block text-sm font-medium text-slate-700">
-                Mode de cle
-              </label>
-              <select
-                id="isTestMode"
-                className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/30"
-                {...register('isTestMode')}
-              >
-                <option value="true">Test (interne)</option>
-                <option value="false">Live (interne)</option>
-              </select>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-lg bg-brand py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:opacity-60"
-            >
-              {loading ? 'Creation…' : 'Creer mon compte marchand'}
-            </button>
-          </form>
-        ) : (
-          <div className="space-y-4">
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-              Compte marchand cree avec succes. Vous pouvez maintenant vous connecter.
-            </div>
-
-            <div className="rounded-lg border border-slate-200 p-4">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Marchand ID</p>
-              <p className="mt-1 font-mono text-sm text-slate-900 break-all">{result.merchantId}</p>
-            </div>
-
-            <div className="rounded-lg border border-slate-200 p-4">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Email</p>
-              <p className="mt-1 text-sm text-slate-900 break-all">{result.email}</p>
-            </div>
-
-            <button
-              onClick={() => navigate('/merchant/login', { state: { prefillEmail: result.email } })}
-              className="w-full rounded-lg bg-brand py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark"
-            >
-              Aller a la connexion
-            </button>
+            <h1 className="font-display font-semibold text-[20px] text-[var(--text-primary)]">
+              Créer un compte marchand
+            </h1>
+            <p className="mt-1.5 text-[13px] text-[var(--text-secondary)]">
+              Accédez au portail marchand ST Pay
+            </p>
           </div>
-        )}
 
-        <p className="mt-6 text-center text-sm text-slate-500">
-          Vous avez deja un compte ?{' '}
-          <Link to="/merchant/login" className="font-medium text-brand hover:underline">
-            Se connecter
-          </Link>
-        </p>
+          {result ? (
+            <SuccessView
+              result={result}
+              onLogin={() => navigate('/merchant/login', { state: { prefillEmail: result.email } })}
+            />
+          ) : (
+            <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+
+              {/* Name */}
+              <Field label="Nom du marchand" error={errors.name?.message}>
+                <input
+                  type="text"
+                  className={INPUT_CLS(!!errors.name)}
+                  placeholder="Acme Corp"
+                  {...register('name', { required: 'Le nom est requis' })}
+                />
+              </Field>
+
+              {/* Email */}
+              <Field label="Adresse e-mail" error={errors.email?.message}>
+                <input
+                  type="email"
+                  autoComplete="email"
+                  className={INPUT_CLS(!!errors.email)}
+                  placeholder="contact@acme.com"
+                  {...register('email', {
+                    required: "L'email est requis",
+                    pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Email invalide' },
+                  })}
+                />
+              </Field>
+
+              {/* Password row */}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Mot de passe" error={errors.password?.message}>
+                  <input
+                    type="password"
+                    className={INPUT_CLS(!!errors.password)}
+                    placeholder="••••••••"
+                    {...register('password', {
+                      required: 'Mot de passe requis',
+                      minLength: { value: 8, message: 'Min. 8 caractères' },
+                    })}
+                  />
+                </Field>
+                <Field label="Confirmation" error={errors.confirmPassword?.message}>
+                  <input
+                    type="password"
+                    className={INPUT_CLS(!!errors.confirmPassword)}
+                    placeholder="••••••••"
+                    {...register('confirmPassword', {
+                      required: 'Confirmation requise',
+                      validate: (v) => v === watch('password') || 'Ne correspond pas',
+                    })}
+                  />
+                </Field>
+              </div>
+
+              {/* Webhook URL */}
+              <Field label="URL Webhook (optionnel)" error={errors.webhookUrl?.message}>
+                <input
+                  type="url"
+                  className={INPUT_CLS(!!errors.webhookUrl)}
+                  placeholder="https://votre-serveur.com/webhooks/stpay"
+                  {...register('webhookUrl', {
+                    pattern: { value: /^$|https?:\/\/.+/i, message: 'URL invalide' },
+                  })}
+                />
+              </Field>
+
+              {/* Mode selector */}
+              <div>
+                <p className="mb-2 text-[12px] font-medium text-[var(--text-secondary)]">
+                  Type de clé API
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { val: 'true',  label: 'Test',  sub: 'sk_test_…',  color: 'amber' },
+                    { val: 'false', label: 'Live',  sub: 'sk_live_…',  color: 'green' },
+                  ].map(({ val, label, sub, color }) => {
+                    const checked = watch('isTestMode') === val
+                    return (
+                      <label
+                        key={val}
+                        className={`flex items-center gap-3 p-3 rounded-[var(--radius-sm)]
+                                    border cursor-pointer transition-all
+                                    ${checked
+                                      ? color === 'amber'
+                                        ? 'border-[rgba(245,158,11,0.3)] bg-[var(--amber-bg)]'
+                                        : 'border-[rgba(34,197,94,0.3)] bg-[var(--green-bg)]'
+                                      : 'border-[var(--border-soft)] bg-transparent hover:bg-[var(--bg-overlay)]'}`}
+                      >
+                        <input type="radio" value={val}
+                               className="sr-only" {...register('isTestMode')} />
+                        <div className={`w-3 h-3 rounded-full border-2 flex-shrink-0 transition-colors
+                          ${checked
+                            ? color === 'amber'
+                              ? 'border-[var(--amber)] bg-[var(--amber)]'
+                              : 'border-[var(--green)] bg-[var(--green)]'
+                            : 'border-[var(--border-medium)] bg-transparent'}`} />
+                        <div>
+                          <p className="text-[12px] font-medium text-[var(--text-primary)]">{label}</p>
+                          <p className="text-[10px] font-mono text-[var(--text-muted)]">{sub}</p>
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full mt-2 py-2.5 rounded-[var(--radius-sm)] text-[13px] font-semibold
+                           text-[#0E0F14] bg-[var(--gold)] hover:bg-[var(--gold-bright)]
+                           transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Création en cours…' : 'Créer mon compte marchand'}
+              </button>
+            </form>
+          )}
+
+          {/* Footer */}
+          {!result && (
+            <p className="mt-6 text-center text-[12px] text-[var(--text-muted)]">
+              Vous avez déjà un compte ?{' '}
+              <Link to="/merchant/login"
+                    className="text-[var(--gold)] hover:text-[var(--gold-bright)] font-medium transition-colors">
+                Se connecter
+              </Link>
+            </p>
+          )}
+        </div>
       </div>
     </div>
   )

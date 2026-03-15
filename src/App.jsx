@@ -19,6 +19,7 @@ import Escrow from './pages/Escrow';
 import MerchantProfile from './pages/MerchantProfile';
 import PortalSelect from './pages/PortalSelect';
 
+
 function HomeRedirect() {
   const { isAuthenticated, isSuperAdmin } = useAuth();
 
@@ -43,38 +44,36 @@ function RequireRole({ role, children }) {
 function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      {/* ── Dark-themed toasts ── */}
       <Toaster
         position="top-right"
         toastOptions={{
           duration: 4000,
           style: {
-            background: '#1A1D27',
-            color: '#F0F1F5',
-            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.4), 0 8px 10px -6px rgba(0,0,0,0.3)',
-            border: '1px solid rgba(255,255,255,0.10)',
-            borderRadius: '10px',
-            fontSize: '13px',
-            fontWeight: '500',
-            fontFamily: "'DM Sans', sans-serif",
-          },
-          success: { iconTheme: { primary: '#22C55E', secondary: '#1A1D27' } },
-          error:   { iconTheme: { primary: '#EF4444', secondary: '#1A1D27' } },
+    background: '#FFFFFF',
+    color: '#1A1A1A',
+    border: '1px solid #E2E0D8',
+    borderRadius: '10px',
+    fontSize: '13px',
+    fontWeight: '600',
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+    },
+    success: { iconTheme: { primary: '#1A7A40', secondary: '#E8F7EE' } },
+    error:   { iconTheme: { primary: '#C02020', secondary: '#FEE8E8' } },
         }}
       />
-
       <Routes>
-        {/* ── Public ── */}
-        <Route path="/login"         element={<Navigate to="/choose-portal" replace />} />
+        {/* Public */}
+        <Route path="/login" element={<Navigate to="/choose-portal" replace />} />
         <Route path="/choose-portal" element={<PortalSelect />} />
         <Route path="/merchant/login" element={<Login portal="merchant" />} />
-        <Route path="/admin/login"    element={<Login portal="admin" />} />
-        <Route path="/register"       element={<MerchantRegister />} />
+        <Route path="/admin/login" element={<Login portal="admin" />} />
+        <Route path="/register" element={<MerchantRegister />} />
 
-        {/* ── Root ── */}
+        {/* Root */}
         <Route path="/" element={<HomeRedirect />} />
 
-        {/* ── Admin area ── */}
+        {/* Admin area */}
         <Route
           path="/admin"
           element={
@@ -144,7 +143,7 @@ function App() {
           />
         </Route>
 
-        {/* ── Merchant area ── */}
+        {/* Merchant area */}
         <Route
           path="/merchant"
           element={
@@ -206,7 +205,7 @@ function App() {
           />
         </Route>
 
-        {/* ── Catch-all ── */}
+        {/* Catch-all */}
         <Route path="*" element={<HomeRedirect />} />
       </Routes>
     </Router>
