@@ -1,139 +1,212 @@
 import React from 'react';
-import { HashRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import PaymentForm from './features/payment/PaymentForm';
-import PaymentStatus from './features/payment/PaymentStatus';
-import PaymentList from './features/payment/PaymentList';
-import Dashboard from './components/Dashboard';
-import ApiStatus from './components/ApiStatus';
-import ApiPlayground from './components/ApiPlayground';
-import ApiKeyManager from './components/ApiKeyManager';
-import MobilePaymentSimulator from './components/MobilePaymentSimulator';
-import EventsApp from './features/EventsApp';
-import './App.css';
-import './features/events.css';
+
+import DashboardLayout from './components/layout/DashboardLayout';
+import RequireAuth from './components/auth/RequireAuth';
+import RequirePermission from './components/auth/RequirePermission';
+import { useAuth } from './hooks/useAuth';
+
+import Login from './pages/Login';
+import MerchantRegister from './pages/MerchantRegister';
+import Overview from './pages/Overview';
+import Transactions from './pages/Transactions';
+import Merchants from './pages/Merchants';
+import Webhooks from './pages/Webhooks';
+import Analytics from './pages/Analytics';
+import ProvidersHealth from './pages/ProvidersHealth';
+import Escrow from './pages/Escrow';
+import MerchantProfile from './pages/MerchantProfile';
+import PortalSelect from './pages/PortalSelect';
+
+function HomeRedirect() {
+  const { isAuthenticated, isSuperAdmin } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/choose-portal" replace />;
+  }
+
+  return <Navigate to={isSuperAdmin ? '/admin' : '/merchant'} replace />;
+}
+
+function RequireRole({ role, children }) {
+  const { user } = useAuth();
+
+  if (user.role !== role) {
+    const fallback = user.role === 'super_admin' ? '/admin' : '/merchant';
+    return <Navigate to={fallback} replace />;
+  }
+
+  return children;
+}
 
 function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <div className="App">
-        <Toaster 
-          position="top-right" 
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: 'white',
-              color: '#374151',
-              boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
-              border: '1px solid #e5e7eb',
-              borderRadius: '12px',
-              fontSize: '14px',
-              fontWeight: '500',
-            },
-            success: {
-              iconTheme: {
-                primary: '#10b981',
-                secondary: 'white',
-              },
-            },
-            error: {
-              iconTheme: {
-                primary: '#ef4444',
-                secondary: 'white',
-              },
-            },
-          }}
-        />
-        
-        <ApiStatus />
-        <Navigation />
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: 'white',
+            color: '#374151',
+            boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+            border: '1px solid #e5e7eb',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: '500',
+          },
+          success: { iconTheme: { primary: '#10b981', secondary: 'white' } },
+          error: { iconTheme: { primary: '#ef4444', secondary: 'white' } },
+        }}
+      />
+      <Routes>
+        {/* Public */}
+        <Route path="/login" element={<Navigate to="/choose-portal" replace />} />
+        <Route path="/choose-portal" element={<PortalSelect />} />
+        <Route path="/merchant/login" element={<Login portal="merchant" />} />
+        <Route path="/admin/login" element={<Login portal="admin" />} />
+        <Route path="/register" element={<MerchantRegister />} />
 
-        <main>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/process" element={<PaymentForm />} />
-            <Route path="/status" element={<PaymentStatus />} />
-            <Route path="/payments" element={<PaymentList />} />
-            <Route path="/events" element={<EventsApp />} />
-            <Route path="/api-playground" element={<ApiPlayground />} />
-            <Route path="/api-keys" element={<ApiKeyManager />} />
-            <Route path="/simulator" element={<MobilePaymentSimulator />} />
-          </Routes>
-        </main>
+        {/* Root */}
+        <Route path="/" element={<HomeRedirect />} />
 
-        <footer className="footer">
-          <div className="container">
-            <p>&copy; 2025 ST Pay Gateway. Powered by modern technology.</p>
-          </div>
-        </footer>
-      </div>
+        {/* Admin area */}
+        <Route
+          path="/admin"
+          element={
+            <RequireAuth>
+              <RequireRole role="super_admin">
+                <DashboardLayout />
+              </RequireRole>
+            </RequireAuth>
+          }
+        >
+          <Route index element={<Overview />} />
+          <Route
+            path="transactions"
+            element={
+              <RequirePermission permission={['transactions.view_own', 'transactions.view_all']}>
+                <Transactions />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="merchants"
+            element={
+              <RequirePermission permission="merchants.view_all">
+                <Merchants />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="webhooks"
+            element={
+              <RequirePermission permission={['webhooks.view_own', 'webhooks.view_all']}>
+                <Webhooks />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="analytics"
+            element={
+              <RequirePermission permission={['analytics.view_own', 'analytics.view_all']}>
+                <Analytics />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="providers"
+            element={
+              <RequirePermission permission="providers.view_health">
+                <ProvidersHealth />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="escrow"
+            element={
+              <RequirePermission permission={['escrow.view_own', 'escrow.release_manual']}>
+                <Escrow />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="profile"
+            element={
+              <RequirePermission permission="merchants.view_own">
+                <MerchantProfile />
+              </RequirePermission>
+            }
+          />
+        </Route>
+
+        {/* Merchant area */}
+        <Route
+          path="/merchant"
+          element={
+            <RequireAuth>
+              <RequireRole role="merchant">
+                <DashboardLayout />
+              </RequireRole>
+            </RequireAuth>
+          }
+        >
+          <Route index element={<Overview />} />
+          <Route
+            path="transactions"
+            element={
+              <RequirePermission permission={['transactions.view_own', 'transactions.view_all']}>
+                <Transactions />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="webhooks"
+            element={
+              <RequirePermission permission={['webhooks.view_own', 'webhooks.view_all']}>
+                <Webhooks />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="analytics"
+            element={
+              <RequirePermission permission={['analytics.view_own', 'analytics.view_all']}>
+                <Analytics />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="providers"
+            element={
+              <RequirePermission permission="providers.view_health">
+                <ProvidersHealth />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="escrow"
+            element={
+              <RequirePermission permission={['escrow.view_own', 'escrow.release_manual']}>
+                <Escrow />
+              </RequirePermission>
+            }
+          />
+          <Route
+            path="profile"
+            element={
+              <RequirePermission permission="merchants.view_own">
+                <MerchantProfile />
+              </RequirePermission>
+            }
+          />
+        </Route>
+
+        {/* Catch-all */}
+        <Route path="*" element={<HomeRedirect />} />
+      </Routes>
     </Router>
-  );
-}
-
-function Navigation() {
-  const location = useLocation();
-  
-  const isActive = (path) => location.pathname === path;
-  
-  return (
-    <nav className="navbar">
-      <div className="container">
-        <Link to="/" className="logo">
-          ST Pay Gateway
-        </Link>
-        <div className="nav-links">
-          <Link 
-            to="/" 
-            className={`nav-link ${isActive('/') ? 'active' : ''}`}
-          >
-            🏠 Dashboard
-          </Link>
-          <Link 
-            to="/process" 
-            className={`nav-link ${isActive('/process') ? 'active' : ''}`}
-          >
-            💳 Process Payment
-          </Link>
-          <Link 
-            to="/events" 
-            className={`nav-link ${isActive('/events') ? 'active' : ''}`}
-          >
-            🎪 Events
-          </Link>
-          <Link 
-            to="/status" 
-            className={`nav-link ${isActive('/status') ? 'active' : ''}`}
-          >
-            📊 Check Status
-          </Link>
-          <Link 
-            to="/payments" 
-            className={`nav-link ${isActive('/payments') ? 'active' : ''}`}
-          >
-            📋 Payment History
-          </Link>
-          <Link
-            to="/simulator"
-            className={`nav-link ${isActive('/simulator') ? 'active' : ''}`}
-          >
-            📱 Mobile Simulator
-          </Link>
-          <Link
-            to="/api-playground"
-            className={`nav-link ${isActive('/api-playground') ? 'active' : ''}`}
-          >
-            🧪 API Playground
-          </Link>
-          <Link
-            to="/api-keys"
-            className={`nav-link ${isActive('/api-keys') ? 'active' : ''}`}
-          >
-            🔑 API Keys
-          </Link>
-        </div>
-      </div>
-    </nav>
   );
 }
 
