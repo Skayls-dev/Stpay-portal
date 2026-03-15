@@ -1,4 +1,139 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-base:        #0E0F14;
+    --bg-raised:      #13151C;
+    --bg-overlay:     #1A1D27;
+    --bg-subtle:      #21253A;
+    --border-soft:    rgba(255, 255, 255, 0.07);
+    --border-medium:  rgba(255, 255, 255, 0.12);
+    --text-primary:   #F0F1F5;
+    --text-secondary: #8A8EA6;
+    --text-muted:     #5A5E78;
+    --gold:           #F5A623;
+    --gold-bright:    #FFCF6B;
+    --gold-bg:        rgba(245, 166, 35, 0.08);
+    --gold-border:    rgba(245, 166, 35, 0.18);
+    --green:          #22C55E;
+    --green-bg:       rgba(34, 197, 94, 0.10);
+    --red:            #EF4444;
+    --red-bg:         rgba(239, 68, 68, 0.10);
+    --amber:          #F59E0B;
+    --amber-bg:       rgba(245, 158, 11, 0.10);
+    --blue:           #3B82F6;
+    --blue-bg:        rgba(59, 130, 246, 0.10);
+    --radius-sm:      6px;
+    --radius-md:      10px;
+    --radius-lg:      14px;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    font-family: 'DM Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Scrollbars */
+  ::-webkit-scrollbar          { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track    { background: transparent; }
+  ::-webkit-scrollbar-thumb    { background: var(--bg-subtle); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-medium); }
+}
+
+@layer components {
+  /* ─── Typography ─── */
+  .font-display { font-family: 'Syne', sans-serif; }
+  .font-mono-st  { font-family: 'DM Mono', monospace; }
+
+  /* ─── Pulse animation for live dots ─── */
+  @keyframes sp-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.35; }
+  }
+  .animate-pulse-slow { animation: sp-pulse 2s ease-in-out infinite; }
+
+  /* ─── Sidebar nav item ─── */
+  .nav-item {
+    @apply flex items-center gap-2.5 px-2.5 py-2 rounded-md text-[13px] font-normal
+           text-[var(--text-secondary)] cursor-pointer transition-all duration-150
+           border border-transparent;
+  }
+  .nav-item:hover {
+    @apply bg-[var(--bg-overlay)] text-[var(--text-primary)];
+  }
+  .nav-item.active {
+    background: var(--gold-bg);
+    border-color: var(--gold-border);
+    color: var(--gold-bright);
+    font-weight: 500;
+  }
+
+  /* ─── KPI card ─── */
+  .kpi-card {
+    @apply bg-[var(--bg-raised)] border border-[var(--border-soft)] rounded-[var(--radius-md)]
+           p-4 flex flex-col gap-2 transition-colors duration-150 cursor-default;
+  }
+  .kpi-card:hover {
+    border-color: var(--border-medium);
+  }
+
+  /* ─── Panel ─── */
+  .panel {
+    @apply bg-[var(--bg-raised)] border border-[var(--border-soft)] rounded-[var(--radius-md)] overflow-hidden;
+  }
+  .panel-header {
+    @apply flex items-center justify-between px-4 py-3 border-b border-[var(--border-soft)];
+  }
+  .panel-title {
+    @apply text-[13px] font-semibold text-[var(--text-primary)] font-display;
+  }
+
+  /* ─── Status badge ─── */
+  .st-badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold;
+  }
+  .st-badge-success { @apply bg-[var(--green-bg)] text-[var(--green)]; }
+  .st-badge-pending { @apply bg-[var(--amber-bg)] text-[var(--amber)]; }
+  .st-badge-failed  { @apply bg-[var(--red-bg)]   text-[var(--red)];   }
+  .st-badge-blue    { @apply bg-[var(--blue-bg)]  text-[var(--blue)];  }
+
+  /* ─── Button primary (gold) ─── */
+  .btn-gold {
+    @apply flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-semibold
+           bg-[var(--gold)] text-[#0E0F14] transition-colors duration-150 cursor-pointer border-0;
+  }
+  .btn-gold:hover { background: var(--gold-bright); }
+
+  /* ─── Button ghost ─── */
+  .btn-ghost {
+    @apply flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-normal
+           border border-[var(--border-medium)] text-[var(--text-secondary)]
+           bg-transparent transition-all duration-150 cursor-pointer;
+  }
+  .btn-ghost:hover {
+    @apply bg-[var(--bg-overlay)] text-[var(--text-primary)];
+  }
+
+  /* ─── Provider badge colours ─── */
+  .prov-mtn { background: rgba(255,204,0,0.15); color: #FFCC00; }
+  .prov-ora { background: rgba(255,102,0,0.15); color: #FF6600; }
+  .prov-wav { background: rgba(59,130,246,0.15); color: #60A5FA; }
+  .prov-moov { background: rgba(100,160,80,0.15); color: #7EC96A; }
+}

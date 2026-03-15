@@ -43,35 +43,38 @@ function RequireRole({ role, children }) {
 function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      {/* ── Dark-themed toasts ── */}
       <Toaster
         position="top-right"
         toastOptions={{
           duration: 4000,
           style: {
-            background: 'white',
-            color: '#374151',
-            boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
-            border: '1px solid #e5e7eb',
-            borderRadius: '12px',
-            fontSize: '14px',
+            background: '#1A1D27',
+            color: '#F0F1F5',
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.4), 0 8px 10px -6px rgba(0,0,0,0.3)',
+            border: '1px solid rgba(255,255,255,0.10)',
+            borderRadius: '10px',
+            fontSize: '13px',
             fontWeight: '500',
+            fontFamily: "'DM Sans', sans-serif",
           },
-          success: { iconTheme: { primary: '#10b981', secondary: 'white' } },
-          error: { iconTheme: { primary: '#ef4444', secondary: 'white' } },
+          success: { iconTheme: { primary: '#22C55E', secondary: '#1A1D27' } },
+          error:   { iconTheme: { primary: '#EF4444', secondary: '#1A1D27' } },
         }}
       />
+
       <Routes>
-        {/* Public */}
-        <Route path="/login" element={<Navigate to="/choose-portal" replace />} />
+        {/* ── Public ── */}
+        <Route path="/login"         element={<Navigate to="/choose-portal" replace />} />
         <Route path="/choose-portal" element={<PortalSelect />} />
         <Route path="/merchant/login" element={<Login portal="merchant" />} />
-        <Route path="/admin/login" element={<Login portal="admin" />} />
-        <Route path="/register" element={<MerchantRegister />} />
+        <Route path="/admin/login"    element={<Login portal="admin" />} />
+        <Route path="/register"       element={<MerchantRegister />} />
 
-        {/* Root */}
+        {/* ── Root ── */}
         <Route path="/" element={<HomeRedirect />} />
 
-        {/* Admin area */}
+        {/* ── Admin area ── */}
         <Route
           path="/admin"
           element={
@@ -141,7 +144,7 @@ function App() {
           />
         </Route>
 
-        {/* Merchant area */}
+        {/* ── Merchant area ── */}
         <Route
           path="/merchant"
           element={
@@ -203,7 +206,7 @@ function App() {
           />
         </Route>
 
-        {/* Catch-all */}
+        {/* ── Catch-all ── */}
         <Route path="*" element={<HomeRedirect />} />
       </Routes>
     </Router>
