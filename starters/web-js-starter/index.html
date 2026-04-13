@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ST Pay Web Starter</title>
+  <style>
+    body { font-family: Segoe UI, Arial, sans-serif; margin: 24px; max-width: 720px; }
+    button { padding: 8px 12px; cursor: pointer; }
+    pre { background: #f6f8fa; padding: 12px; border-radius: 8px; overflow: auto; }
+    .row { display: grid; gap: 8px; margin-bottom: 12px; }
+    input, select { padding: 8px; }
+  </style>
+</head>
+<body>
+  <h1>ST Pay - Web Starter</h1>
+  <p>Configure values in <code>app.js</code>, then click <strong>Create Payment</strong>.</p>
+
+  <div class="row">
+    <label>Amount</label>
+    <input id="amount" type="number" value="5000" min="1" />
+  </div>
+
+  <div class="row">
+    <label>Provider</label>
+    <select id="provider">
+      <option>MTN</option>
+      <option>ORANGE</option>
+      <option>MOOV</option>
+      <option>WAVE</option>
+    </select>
+  </div>
+
+  <button id="payBtn">Create Payment</button>
+  <h3>Result</h3>
+  <pre id="output">Ready.</pre>
+
+  <script src="./app.js"></script>
+</body>
+</html>

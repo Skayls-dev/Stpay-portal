@@ -1,6 +1,7 @@
 // src/pages/Overview.tsx
 import React, { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { analyticsApi, transactionsApi, POLL_INTERVAL_TRANSACTIONS } from '../lib/api/modules'
 import { Badge, DataTable } from '../components/ui'
@@ -205,6 +206,57 @@ function TopMerchantsPanel({ merchants }: { merchants: { merchant: string; amoun
   )
 }
 
+function AdminIncidentsPanel({ recent }: { recent: Transaction[] }) {
+  const failedCount = recent.filter((tx) => ['failed', 'error', 'rejected', 'cancelled', 'canceled'].includes(tx.status.toLowerCase())).length
+  const pendingCount = recent.filter((tx) => ['pending', 'processing', 'initiated'].includes(tx.status.toLowerCase())).length
+
+  return (
+    <div className="panel">
+      <div className="panel-header"><span className="panel-title">Incidents & surveillance</span></div>
+      <div className="p-4 space-y-2.5">
+        <div className="flex items-center justify-between rounded-[var(--r-sm)] border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 py-2">
+          <span className="text-[11px] text-[var(--text-2)]">Transactions en echec</span>
+          <Badge color={failedCount > 0 ? 'red' : 'emerald'} dot>{failedCount}</Badge>
+        </div>
+        <div className="flex items-center justify-between rounded-[var(--r-sm)] border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 py-2">
+          <span className="text-[11px] text-[var(--text-2)]">Transactions en attente</span>
+          <Badge color={pendingCount > 0 ? 'amber' : 'emerald'} dot>{pendingCount}</Badge>
+        </div>
+        <div className="flex items-center justify-between rounded-[var(--r-sm)] border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 py-2">
+          <span className="text-[11px] text-[var(--text-2)]">Etat connectivite backend</span>
+          <Badge color="emerald" dot>OK</Badge>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AdminOpsPanel() {
+  const links = [
+    { to: '/admin/traceability', label: 'Traceability financiere' },
+    { to: '/admin/settlements', label: 'Validation settlements' },
+    { to: '/admin/webhooks', label: 'Supervision webhooks' },
+    { to: '/admin/providers', label: 'Sante operateurs' },
+  ]
+
+  return (
+    <div className="panel">
+      <div className="panel-header"><span className="panel-title">Operations admin</span></div>
+      <div className="p-3 space-y-2">
+        {links.map((item) => (
+          <Link
+            key={item.to}
+            to={item.to}
+            className="block rounded-[var(--r-sm)] border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 py-2 text-[11px] font-semibold text-[var(--text-2)] transition-colors hover:border-[var(--orange-border)] hover:text-[var(--orange)]"
+          >
+            {item.label}
+          </Link>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ─── Table columns ────────────────────────────────────────────────────────────
 const RECENT_COLS: DataTableColumn<Transaction>[] = [
   {
@@ -275,6 +327,20 @@ export default function Overview() {
   return (
     <div className="space-y-4">
 
+      {isSuperAdmin && (
+        <div className="rounded-[var(--r-md)] border border-[var(--orange-border)] bg-[var(--orange-bg)] px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[12px] font-bold text-[var(--orange-dark)]">Cockpit Super Admin</p>
+              <p className="text-[11px] text-[var(--text-2)] mt-0.5">
+                Supervision globale des operations, risques et performance plateforme
+              </p>
+            </div>
+            <Badge color="amber" dot>Mode admin</Badge>
+          </div>
+        </div>
+      )}
+
       {/* Period tabs */}
       <div className="flex items-center justify-between">
         <div className="flex gap-0.5 bg-[var(--border)] p-[3px] rounded-[7px]">
@@ -337,8 +403,8 @@ export default function Overview() {
         {/* Transactions panel */}
         <div className="panel">
           <div className="panel-header">
-            <span className="panel-title">Transactions récentes</span>
-            <span className="panel-link">Voir tout →</span>
+            <span className="panel-title">{isSuperAdmin ? 'Transactions globales' : 'Transactions récentes'}</span>
+            <span className="panel-link">{isSuperAdmin ? 'Analyse globale →' : 'Voir tout →'}</span>
           </div>
           <Sparkline />
           {recentLoading ? (
@@ -356,10 +422,15 @@ export default function Overview() {
         {/* Right */}
         <div className="space-y-3">
           <ProvidersPanel />
-          {isSuperAdmin
-            ? <TopMerchantsPanel merchants={topMerchants} />
-            : <EscrowPanel />
-          }
+          {isSuperAdmin ? (
+            <>
+              <TopMerchantsPanel merchants={topMerchants} />
+              <AdminIncidentsPanel recent={recent} />
+              <AdminOpsPanel />
+            </>
+          ) : (
+            <EscrowPanel />
+          )}
         </div>
       </div>
     </div>

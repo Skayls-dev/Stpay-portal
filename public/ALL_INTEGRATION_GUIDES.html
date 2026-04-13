@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ST Pay - All Integration Guides</title>
+    <style>
+      :root {
+        --bg: #f6f8fb;
+        --card: #ffffff;
+        --text: #0f172a;
+        --muted: #475569;
+        --line: #dbe3ef;
+        --brand: #0f766e;
+        --brand-soft: #ccfbf1;
+        --accent: #b45309;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", "Trebuchet MS", Tahoma, sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at 10% 10%, #e2f4f1 0%, transparent 40%),
+          radial-gradient(circle at 90% 0%, #ffe9c9 0%, transparent 38%),
+          var(--bg);
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 28px 18px 56px;
+      }
+      .hero {
+        background: linear-gradient(120deg, #0f766e, #115e59);
+        color: #fff;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 14px 32px rgba(15, 118, 110, 0.24);
+      }
+      .hero h1 {
+        margin: 0 0 8px;
+        font-size: 30px;
+        line-height: 1.2;
+      }
+      .hero p {
+        margin: 0;
+        color: #d1fae5;
+      }
+      .toc {
+        margin-top: 16px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 10px;
+      }
+      .toc a {
+        text-decoration: none;
+        color: #134e4a;
+        background: var(--brand-soft);
+        border: 1px solid #99f6e4;
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-weight: 700;
+        font-size: 13px;
+      }
+      .section {
+        margin-top: 16px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 16px;
+      }
+      .section h2 {
+        margin: 0 0 8px;
+        font-size: 20px;
+      }
+      .meta {
+        color: var(--muted);
+        font-size: 13px;
+        margin-bottom: 10px;
+      }
+      ul { margin: 8px 0 0 18px; }
+      li { margin: 4px 0; }
+      code {
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 1px 6px;
+      }
+      .footer {
+        margin-top: 18px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .pill {
+        display: inline-block;
+        background: #ffedd5;
+        border: 1px solid #fed7aa;
+        color: var(--accent);
+        font-weight: 700;
+        font-size: 11px;
+        border-radius: 999px;
+        padding: 4px 8px;
+        margin-bottom: 8px;
+      }
+      @media (max-width: 640px) {
+        .hero h1 { font-size: 24px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <section class="hero">
+        <h1>ST Pay - All Integration Guides</h1>
+        <p>Version complete des 10 guides, reprenant integralement le contenu des fichiers Markdown.</p>
+      </section>
+
+      <nav class="toc" aria-label="Table des matieres">
+        <a href="#first-payment">1. Premier paiement en 10 minutes</a>
+        <a href="#webhooks">2. Webhooks de production</a>
+        <a href="#error-handling">3. Gestion des erreurs et reprise</a>
+        <a href="#api-security">4. Securite API pour marchands</a>
+        <a href="#multi-operator">5. Mobile money multi-operateurs</a>
+        <a href="#go-live">6. Go-live checklist</a>
+        <a href="#observability">7. Observabilite et analytics</a>
+        <a href="#automated-tests">8. Tests automatises integration</a>
+        <a href="#api-migration">9. Migration de version API</a>
+        <a href="#l1-support">10. Support L1 pour juniors</a>
+      </nav>
+
+      <section id="first-payment" class="section">
+        <span class="pill">Onboarding</span>
+        <h2>1. Guide - Premier paiement en 10 minutes</h2>
+        <h3>Objectif</h3>
+        <p>Valider un premier paiement de bout en bout avec un minimum d etapes.</p>
+        <ol>
+          <li>S authentifier cote marchand</li>
+          <li>Creer un paiement</li>
+          <li>Lire le statut</li>
+          <li>Verifier le webhook (si configure)</li>
+        </ol>
+        <h3>Prerequis</h3>
+        <ul>
+          <li>API backend disponible sur http://localhost:5169</li>
+          <li>Compte marchand de test (email + mot de passe)</li>
+          <li>Cle API marchand</li>
+        </ul>
+        <h3>Etape 1 - Login marchand</h3>
+        <pre><code>curl -X POST "http://localhost:5169/api/merchant/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"merchant1@stpay.local","password":"Merchant123!"}'</code></pre>
+        <p>Attendu:</p>
+        <ul>
+          <li>Reponse 200</li>
+          <li>Champ token present</li>
+        </ul>
+        <h3>Etape 2 - Verifier la sante API</h3>
+        <pre><code>curl -X GET "http://localhost:5169/api/Payment/health" \
+  -H "X-Api-Key: sk_test_your_key"</code></pre>
+        <p>Attendu:</p>
+        <ul>
+          <li>Reponse 200</li>
+          <li>Statut provider lisible</li>
+        </ul>
+        <h3>Etape 3 - Creer un paiement</h3>
+        <pre><code>curl -X POST "http://localhost:5169/api/Payment" \
+  -H "Content-Type: application/json" \
+  -H "X-Api-Key: sk_test_your_key" \
+  -d '{
+    "amount": 1500,
+    "currency": "XAF",
+    "provider": "MTN",
+    "phoneNumber": "670000001",
+    "description": "Premier test integration"
+  }'</code></pre>
+        <p>Attendu:</p>
+        <ul>
+          <li>Reponse 200 ou 201</li>
+          <li>paymentId present</li>
+          <li>status initial (ex: pending)</li>
+        </ul>
+        <h3>Etape 4 - Lire le statut du paiement</h3>
+        <pre><code>curl -X GET "http://localhost:5169/api/Payment/&lt;paymentId&gt;" \
+  -H "X-Api-Key: sk_test_your_key"</code></pre>
+        <p>Attendu:</p>
+        <ul>
+          <li>paymentId identique</li>
+          <li>status evolue vers success, failed ou reste pending</li>
+        </ul>
+        <h3>Etape 5 - Verifier le webhook (optionnel mais recommande)</h3>
+        <ul>
+          <li>Configurer un endpoint webhook marchand</li>
+          <li>Observer la reception des evenements de statut</li>
+          <li>Verifier la correlation par paymentId</li>
+        </ul>
+        <h3>Erreurs frequentes</h3>
+        <ul>
+          <li>401/403: cle API absente ou invalide</li>
+          <li>400: payload incomplet ou format incorrect</li>
+          <li>404: paymentId inconnu</li>
+          <li>Timeout: provider indisponible ou probleme reseau</li>
+        </ul>
+        <h3>Definition de Done</h3>
+        <ul>
+          <li>Au moins un paiement cree</li>
+          <li>Statut lisible via endpoint GET</li>
+          <li>Webhook recu en environnement de test</li>
+        </ul>
+      </section>
+
+      <section id="webhooks" class="section">
+        <span class="pill">Production</span>
+        <h2>2. Guide - Webhooks de production</h2>
+        <h3>Objectif</h3>
+        <p>Garantir des webhooks fiables, verifiables et idempotents.</p>
+        <h3>Contrat recommande</h3>
+        <ul>
+          <li>Methode: POST</li>
+          <li>Content-Type: application/json</li>
+          <li>Identifiant evenement unique</li>
+          <li>Horodatage evenement</li>
+          <li>Signature HMAC en header</li>
+        </ul>
+        <h3>Verification de signature</h3>
+        <ol>
+          <li>Recuperer le body brut sans transformation</li>
+          <li>Recalculer la signature avec le secret partage</li>
+          <li>Comparer en temps constant</li>
+          <li>Rejeter si mismatch</li>
+        </ol>
+        <p>Pseudo-code:</p>
+        <pre><code>expected = HMAC_SHA256(secret, rawBody)
+if !constantTimeEquals(expected, headerSignature): reject 401</code></pre>
+        <h3>Idempotence</h3>
+        <ul>
+          <li>Conserver eventId dans une table dediee</li>
+          <li>Si eventId deja traite, retourner 200 sans retraiter</li>
+          <li>Les traitements metier doivent etre replay-safe</li>
+        </ul>
+        <h3>Politique de retry</h3>
+        <ul>
+          <li>Retry exponentiel cote emetteur</li>
+          <li>Timeout cible court (ex: 3-5s)</li>
+          <li>Reponse 2xx seulement si traitement principal accepte</li>
+          <li>Reponse 5xx pour demander retry</li>
+        </ul>
+        <h3>Ordre des evenements</h3>
+        <ul>
+          <li>Ne pas supposer un ordre strict</li>
+          <li>Utiliser paymentId + occurredAt pour reconstruire la chronologie</li>
+          <li>Toujours recalculer l etat final par regle metier</li>
+        </ul>
+        <h3>Logging minimum</h3>
+        <ul>
+          <li>requestId</li>
+          <li>eventId</li>
+          <li>paymentId</li>
+          <li>signatureValid</li>
+          <li>traitementResult</li>
+          <li>latence ms</li>
+        </ul>
+        <h3>Checklist pre-prod</h3>
+        <ul>
+          <li>Endpoint HTTPS valide</li>
+          <li>Secret webhook stocke en coffre secret</li>
+          <li>Verification signature active</li>
+          <li>Idempotence active</li>
+          <li>Alertes sur taux d echec webhook</li>
+        </ul>
+        <h3>Incident playbook rapide</h3>
+        <ol>
+          <li>Identifier eventIds en echec</li>
+          <li>Verifier code HTTP et latence</li>
+          <li>Corriger cause (signature, timeout, bug)</li>
+          <li>Relancer retry manuel si necessaire</li>
+          <li>Documenter la cause racine</li>
+        </ol>
+      </section>
+
+      <section id="error-handling" class="section">
+        <span class="pill">Resilience</span>
+        <h2>3. Guide - Gestion des erreurs et reprise</h2>
+        <h3>Objectif</h3>
+        <p>Offrir une strategie standard de gestion d erreurs pour reduire les echecs visibles utilisateur.</p>
+        <h3>Typologie</h3>
+        <ul>
+          <li>Erreurs client (4xx): payload, auth, droits</li>
+          <li>Erreurs serveur (5xx): indisponibilite, bug, surcharge</li>
+          <li>Erreurs provider: timeout, refus operateur, maintenance</li>
+          <li>Erreurs reseau: DNS, TLS, connectivite intermittente</li>
+        </ul>
+        <h3>Matrice de reprise</h3>
+        <ul>
+          <li>400: corriger payload, ne pas retry automatique</li>
+          <li>401/403: rafraichir credentials/cle, puis retry manuel</li>
+          <li>404: verifier identifiant, ne pas retry en boucle</li>
+          <li>409: conflit logique, reconciliation necessaire</li>
+          <li>429: retry avec backoff et jitter</li>
+          <li>500/502/503/504: retry exponentiel borne</li>
+        </ul>
+        <h3>Retry recommande</h3>
+        <ul>
+          <li>Tentative 1 immediate</li>
+          <li>Tentative 2 a +2s</li>
+          <li>Tentative 3 a +5s</li>
+          <li>Tentative 4 a +10s</li>
+          <li>Stop ensuite + escalade</li>
+        </ul>
+        <h3>UX minimum cote frontend</h3>
+        <ul>
+          <li>Message utilisateur clair et actionnable</li>
+          <li>Etat visuel pending/retry/final</li>
+          <li>Bouton Reessayer pour erreurs recuperables</li>
+          <li>Journal local de debug en mode dev</li>
+        </ul>
+        <h3>Reconciliation</h3>
+        <ul>
+          <li>Si doute, lire l etat canonique via GET /api/Payment/{paymentId}</li>
+          <li>Prioriser etat serveur sur etat local</li>
+          <li>Eviter double debit via idempotence metier</li>
+        </ul>
+        <h3>KPI de qualite</h3>
+        <ul>
+          <li>Taux d erreur par endpoint</li>
+          <li>Taux de retry reussi</li>
+          <li>Temps moyen de reprise</li>
+          <li>Taux de tickets lies aux erreurs integrateur</li>
+        </ul>
+      </section>
+
+      <section id="api-security" class="section">
+        <span class="pill">Securite</span>
+        <h2>4. Guide - Securite API pour marchands</h2>
+        <h3>Objectif</h3>
+        <p>Mettre en place un socle securite simple et strict pour integrateurs marchands.</p>
+        <h3>Regles de base</h3>
+        <ul>
+          <li>Une cle par environnement (dev, staging, prod)</li>
+          <li>Aucune cle en dur dans le code frontend public</li>
+          <li>Rotation periodique des cles</li>
+          <li>Revocation immediate en cas de fuite</li>
+        </ul>
+        <h3>Stockage secret</h3>
+        <ul>
+          <li>Backend: variables d environnement ou secret manager</li>
+          <li>Mobile: stockage securise (keystore/keychain)</li>
+          <li>CI/CD: variables protegees, jamais en clair dans les logs</li>
+        </ul>
+        <h3>Controle d acces</h3>
+        <ul>
+          <li>Utiliser les scopes/permissions minimales</li>
+          <li>Separer roles admin et marchand</li>
+          <li>Journaliser toute operation sensible</li>
+        </ul>
+        <h3>Transport</h3>
+        <ul>
+          <li>HTTPS obligatoire en staging/prod</li>
+          <li>Refuser certificats invalides</li>
+          <li>Timeouts et limite de taille payload</li>
+        </ul>
+        <h3>Defenses applicatives</h3>
+        <ul>
+          <li>Validation stricte des entrees</li>
+          <li>Protection replay (nonce/timestamp si applicable)</li>
+          <li>Rate limit par cle API</li>
+          <li>Blocage automatique apres abus detecte</li>
+        </ul>
+        <h3>Audit minimum</h3>
+        <ul>
+          <li>Qui a utilise quelle cle et quand</li>
+          <li>Endpoint cible et resultat (code HTTP)</li>
+          <li>Origine IP/agent quand disponible</li>
+        </ul>
+        <h3>Checklist</h3>
+        <ul>
+          <li>Rotation cle active</li>
+          <li>Secret scanning active dans repo</li>
+          <li>Regles RBAC testees</li>
+          <li>Alertes securite configurees</li>
+        </ul>
+      </section>
+
+      <section id="multi-operator" class="section">
+        <span class="pill">Paiement</span>
+        <h2>5. Guide - Parcours mobile money multi-operateurs</h2>
+        <h3>Objectif</h3>
+        <p>Unifier un flux de paiement unique malgre les differences entre operateurs.</p>
+        <h3>Design recommande</h3>
+        <ol>
+          <li>API interne unique cote marchand</li>
+          <li>Mapping provider-specific dans une couche adaptateur</li>
+          <li>Etats normalises: pending, success, failed, canceled</li>
+        </ol>
+        <h3>Differences frequentes a couvrir</h3>
+        <ul>
+          <li>Delai de confirmation</li>
+          <li>Format numero telephone</li>
+          <li>Codes erreur operateur</li>
+          <li>Fenetres de maintenance</li>
+        </ul>
+        <h3>Payload normalise exemple</h3>
+        <pre><code>{
+  "amount": 2000,
+  "currency": "XAF",
+  "provider": "MTN",
+  "phoneNumber": "670000001",
+  "description": "Paiement commande #123"
+}</code></pre>
+        <h3>Strategie de fallback</h3>
+        <ul>
+          <li>Si provider A indisponible et politique autorisee: proposer provider B</li>
+          <li>Informer clairement l utilisateur final</li>
+          <li>Journaliser tentative initiale + fallback</li>
+        </ul>
+        <h3>Monitoring multi-operateurs</h3>
+        <ul>
+          <li>Taux succes par provider</li>
+          <li>P95 latence par provider</li>
+          <li>Taux timeout par provider</li>
+          <li>Disponibilite /health par provider</li>
+        </ul>
+        <h3>Tests indispensables</h3>
+        <ul>
+          <li>Happy path pour chaque operateur</li>
+          <li>Timeout provider</li>
+          <li>Refus utilisateur</li>
+          <li>Erreur format numero</li>
+          <li>Webhook hors ordre</li>
+        </ul>
+        <h3>Definition de Done</h3>
+        <ul>
+          <li>Un seul contrat frontend</li>
+          <li>Mapping provider documente</li>
+          <li>Alertes comparees par provider</li>
+        </ul>
+      </section>
+
+      <section id="go-live" class="section">
+        <span class="pill">Release</span>
+        <h2>6. Guide - Go-live checklist</h2>
+        <h3>Objectif</h3>
+        <p>Valider qu une integration est prete pour la production sans angle mort.</p>
+        <h3>Checklist technique</h3>
+        <ul>
+          <li>[ ] Variables d environnement prod configurees</li>
+          <li>[ ] Cles API prod distinctes des cles test</li>
+          <li>[ ] Endpoint webhook prod en HTTPS</li>
+          <li>[ ] Verification signature webhook active</li>
+          <li>[ ] Idempotence active sur paiements et webhooks</li>
+          <li>[ ] Rate limiting active</li>
+          <li>[ ] Alertes erreurs et latence configurees</li>
+        </ul>
+        <h3>Checklist fonctionnelle</h3>
+        <ul>
+          <li>[ ] Paiement reussi en pre-prod</li>
+          <li>[ ] Paiement echoue gere proprement</li>
+          <li>[ ] Statut recupere via endpoint GET</li>
+          <li>[ ] Webhook recu et traite</li>
+          <li>[ ] Cas timeout et retry verifies</li>
+        </ul>
+        <h3>Checklist securite</h3>
+        <ul>
+          <li>[ ] Secrets hors code</li>
+          <li>[ ] Rotation cle planifiee</li>
+          <li>[ ] Roles admin/marchand testes</li>
+          <li>[ ] Journaux securite actifs</li>
+        </ul>
+        <h3>Plan de rollback</h3>
+        <ul>
+          <li>[ ] Procedure rollback documentee</li>
+          <li>[ ] Point de contact incident defini</li>
+          <li>[ ] Communication client prete</li>
+          <li>[ ] Script de desactivation partielle disponible</li>
+        </ul>
+        <h3>Fenetre de mise en prod</h3>
+        <ol>
+          <li>Freeze de changements non critiques</li>
+          <li>Go-live progressif (canary si possible)</li>
+          <li>Surveillance renforcee 24-48h</li>
+          <li>Retrospective et actions correctives</li>
+        </ol>
+      </section>
+
+      <section id="observability" class="section">
+        <span class="pill">Pilotage</span>
+        <h2>7. Guide - Observabilite et analytics d integration</h2>
+        <h3>Objectif</h3>
+        <p>Mesurer la qualite de l integration et detecter vite les regressions.</p>
+        <h3>Evenements recommandes</h3>
+        <ul>
+          <li>merchant_login_success</li>
+          <li>api_key_created</li>
+          <li>first_payment_requested</li>
+          <li>payment_status_checked</li>
+          <li>webhook_received</li>
+          <li>webhook_failed</li>
+          <li>postman_minimal_downloaded</li>
+        </ul>
+        <h3>KPI noyau</h3>
+        <ul>
+          <li>Taux de conversion onboarding dev</li>
+          <li>Taux de succes premier paiement</li>
+          <li>Temps median premier paiement</li>
+          <li>Taux de succes webhook</li>
+          <li>Erreurs 4xx/5xx par endpoint</li>
+        </ul>
+        <h3>Dashboards minimum</h3>
+        <ol>
+          <li>Funnel onboarding developpeur</li>
+          <li>Sante API par endpoint</li>
+          <li>Sante providers par operateur</li>
+          <li>Qualite webhooks</li>
+        </ol>
+        <h3>Alertes recommandees</h3>
+        <ul>
+          <li>Erreurs 5xx &gt; seuil pendant 5 min</li>
+          <li>Chute brutale taux succes paiement</li>
+          <li>Hausse latence p95</li>
+          <li>Echec webhook &gt; seuil</li>
+        </ul>
+        <h3>Bonnes pratiques</h3>
+        <ul>
+          <li>Correlation ID sur chaque requete</li>
+          <li>Conserver contexte user/merchant</li>
+          <li>Eviter donnees sensibles en clair dans les logs</li>
+          <li>Standardiser les noms d evenements</li>
+        </ul>
+        <h3>Cadence operationnelle</h3>
+        <ul>
+          <li>Revue quotidienne des KPI critiques</li>
+          <li>Revue hebdo des tendances</li>
+          <li>Plan d action mensuel sur causes racines</li>
+        </ul>
+      </section>
+
+      <section id="automated-tests" class="section">
+        <span class="pill">Qualite</span>
+        <h2>8. Guide - Tests automatises d integration</h2>
+        <h3>Objectif</h3>
+        <p>Eviter les regressions en validant automatiquement les parcours API critiques.</p>
+        <h3>Perimetre minimum</h3>
+        <ul>
+          <li>Auth marchand</li>
+          <li>Creation paiement</li>
+          <li>Lecture statut paiement</li>
+          <li>Reception webhook</li>
+          <li>Cas erreur principal (auth invalide, payload invalide)</li>
+        </ul>
+        <h3>Stack possible</h3>
+        <ul>
+          <li>Collection Postman + Newman en CI</li>
+          <li>Tests API Node ou .NET selon ecosysteme</li>
+          <li>Environnement de test isole</li>
+        </ul>
+        <h3>Scenarios a automatiser</h3>
+        <ol>
+          <li>Happy path paiement</li>
+          <li>Paiement avec provider indisponible</li>
+          <li>Retry apres erreur transitoire</li>
+          <li>Webhook double (idempotence)</li>
+          <li>Verifications RBAC</li>
+        </ol>
+        <h3>Gating CI recommande</h3>
+        <ul>
+          <li>Build OK</li>
+          <li>Tests integration critiques OK</li>
+          <li>Aucun test flaky connu non justifie</li>
+          <li>Rapport archive avec historique</li>
+        </ul>
+        <h3>Qualite des tests</h3>
+        <ul>
+          <li>Deterministes</li>
+          <li>Independants entre eux</li>
+          <li>Donnees de test versionnees</li>
+          <li>Nettoyage post-test</li>
+        </ul>
+        <h3>Resultat attendu</h3>
+        <ul>
+          <li>Feedback en quelques minutes</li>
+          <li>Reduction des incidents de release</li>
+          <li>Confiance accrue avant go-live</li>
+        </ul>
+      </section>
+
+      <section id="api-migration" class="section">
+        <span class="pill">Evolution</span>
+        <h2>9. Guide - Migration de version API</h2>
+        <h3>Objectif</h3>
+        <p>Faire evoluer les integrateurs sans rupture de service.</p>
+        <h3>Strategie</h3>
+        <ol>
+          <li>Publier changelog clair et date de deprecation</li>
+          <li>Maintenir compatibilite transitoire</li>
+          <li>Proposer guide de migration pas a pas</li>
+          <li>Mesurer adoption de la nouvelle version</li>
+        </ol>
+        <h3>Contenu d une release note utile</h3>
+        <ul>
+          <li>Ce qui change</li>
+          <li>Pourquoi cela change</li>
+          <li>Impact integrateur</li>
+          <li>Action requise</li>
+          <li>Date limite</li>
+          <li>Exemple avant/apres</li>
+        </ul>
+        <h3>Plan technique</h3>
+        <ul>
+          <li>Versionner endpoints ou contrats</li>
+          <li>Ajouter feature flags si necessaire</li>
+          <li>Fournir SDK/collection Postman alignes</li>
+          <li>Garder telemetry par version</li>
+        </ul>
+        <h3>Verification</h3>
+        <ul>
+          <li>Tests de non-regression v1</li>
+          <li>Tests complets v2</li>
+          <li>Monitoring erreurs par version</li>
+          <li>Support renforce durant la transition</li>
+        </ul>
+        <h3>Sunset policy</h3>
+        <ul>
+          <li>Communication J-60, J-30, J-7</li>
+          <li>Blocage progressif apres date cible</li>
+          <li>Canal support prioritaire migration</li>
+        </ul>
+      </section>
+
+      <section id="l1-support" class="section">
+        <span class="pill">Support</span>
+        <h2>10. Guide - Support niveau 1 pour juniors</h2>
+        <h3>Objectif</h3>
+        <p>Permettre au support L1 de resoudre rapidement les incidents frequents d integration.</p>
+        <h3>Script de triage (5 questions)</h3>
+        <ol>
+          <li>Quel endpoint et a quelle heure ?</li>
+          <li>Quel code HTTP recu ?</li>
+          <li>Quel paymentId ou requestId ?</li>
+          <li>Cle API valide et environnement correct ?</li>
+          <li>Incident reproductible ou intermittent ?</li>
+        </ol>
+        <h3>Arbre de decision rapide</h3>
+        <ul>
+          <li>401/403 -&gt; verifier cle, role, environnement</li>
+          <li>400 -&gt; verifier payload et champs obligatoires</li>
+          <li>404 -&gt; verifier identifiant ressource</li>
+          <li>5xx -&gt; collecter correlation ID et escalader L2</li>
+          <li>Webhook absent -&gt; verifier URL, signature, logs retries</li>
+        </ul>
+        <h3>Reponses types</h3>
+        <ul>
+          <li>"Nous avons identifie une erreur d authentification, merci de regenerer la cle et retester."</li>
+          <li>"Le payload est incomplet, merci d ajouter les champs requis et renvoyer la requete."</li>
+          <li>"Nous observons une instabilite provider, un retry est en cours."</li>
+        </ul>
+        <h3>Conditions d escalade L2</h3>
+        <ul>
+          <li>Plus de 3 marchands impactes</li>
+          <li>Incident &gt; 30 minutes</li>
+          <li>Echec reproductible sans cause evidente</li>
+          <li>Erreur 5xx persistante</li>
+        </ul>
+        <h3>Donnees minimales a joindre a l escalade</h3>
+        <ul>
+          <li>requestId/correlationId</li>
+          <li>endpoint + methode</li>
+          <li>payload masque</li>
+          <li>timestamp</li>
+          <li>impact business</li>
+        </ul>
+        <h3>KPI support</h3>
+        <ul>
+          <li>Temps de premiere reponse</li>
+          <li>Taux resolution L1</li>
+          <li>Temps moyen resolution</li>
+          <li>Top causes racines mensuelles</li>
+        </ul>
+      </section>
+
+      <p class="footer">Version complete: 2026-03-16 | Source: dossier guides/</p>
+    </div>
+  </body>
+</html>

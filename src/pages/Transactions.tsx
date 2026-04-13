@@ -1,6 +1,7 @@
 // src/pages/Transactions.tsx
 import React, { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { transactionsApi, POLL_INTERVAL_TRANSACTIONS } from '../lib/api/modules'
 import { Badge, Input, Select, Button } from '../components/ui'
@@ -32,6 +33,44 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
+function escrowStatusLabel(status: string) {
+  const s = (status || '').toLowerCase()
+  if (s === 'delivered') return 'livre'
+  if (s === 'released') return 'libere'
+  if (s === 'in_transit' || s === 'intransit') return 'en transit'
+  if (s === 'disputed') return 'litige'
+  if (s === 'held') return 'bloque'
+  return s || 'actif'
+}
+
+function EscrowBadge({
+  escrow,
+  onClick,
+}: {
+  escrow?: Transaction['escrow']
+  onClick?: () => void
+}) {
+  if (!escrow?.escrowId) return null
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick?.()
+      }}
+      className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300 hover:bg-emerald-500/20"
+      title="Ouvrir le détail escrow"
+    >
+      <svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
+        <path d="M5.5 7V5.8a2.5 2.5 0 115 0V7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+      Escrow · {escrowStatusLabel(escrow.status)}
+    </button>
+  )
+}
+
 function fmtCur(n: number, cur: string) {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: cur }).format(n)
 }
@@ -47,6 +86,7 @@ function fmtShort(iso?: string | null) {
 }
 
 function DetailPanel({ tx, onClose }: { tx: Transaction|null; onClose: () => void }) {
+  const navigate = useNavigate()
   const [visible, setVisible] = useState(false)
   useEffect(() => {
     if (tx) requestAnimationFrame(() => setVisible(true))
@@ -100,6 +140,10 @@ function DetailPanel({ tx, onClose }: { tx: Transaction|null; onClose: () => voi
             </p>
             <div className="flex items-center gap-2 mt-3">
               <StatusBadge status={tx.status}/>
+              <EscrowBadge
+                escrow={tx.escrow}
+                onClick={() => navigate(`/escrow?highlight=${encodeURIComponent(tx.escrow!.escrowId)}`)}
+              />
               <ProvBadge name={tx.provider}/>
               <span className="text-[11px] text-[var(--text-3)]">{fmtShort(tx.createdAt)}</span>
             </div>
@@ -146,6 +190,7 @@ function SkeletonRow() {
 }
 
 export default function Transactions() {
+  const navigate = useNavigate()
   const { isSuperAdmin } = useAuth()
   const [statusFilter, setStatusFilter]   = useState('all')
   const [providerFilter, setProviderFilter] = useState('all')
@@ -287,7 +332,15 @@ export default function Transactions() {
                         {fmtCur(tx.amount, tx.currency)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center"><StatusBadge status={tx.status}/></td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="inline-flex items-center gap-2">
+                        <StatusBadge status={tx.status}/>
+                        <EscrowBadge
+                          escrow={tx.escrow}
+                          onClick={() => navigate(`/escrow?highlight=${encodeURIComponent(tx.escrow!.escrowId)}`)}
+                        />
+                      </div>
+                    </td>
                     {isSuperAdmin && (
                       <td className="px-4 py-3">
                         <span className="text-[11px] text-[var(--text-2)] truncate max-w-[130px] block">

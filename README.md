@@ -11,6 +11,29 @@ A React.js frontend application for the ST Pay payment gateway microservice.
 - **Responsive Design**: Mobile-friendly interface
 - **Real-time Feedback**: Toast notifications for user actions
 
+## Week 2 - Delivery Status
+
+Week 2 planning is now documented and executable with dedicated guides:
+
+- Mobile frequent errors guide: [MOBILE_INTEGRATION_ERRORS.md](MOBILE_INTEGRATION_ERRORS.md)
+- SDK stable publication checklist (Web + React Native): [SDK_RELEASE_CHECKLIST.md](SDK_RELEASE_CHECKLIST.md)
+- SDK implementation guide: [SDK_README.md](SDK_README.md)
+
+## Week 3 - Starter Apps
+
+Starter templates are now available for fast integration:
+
+- Global starter index: [starters/README.md](starters/README.md)
+- Web starter: [starters/web-js-starter/index.html](starters/web-js-starter/index.html)
+- React Native starter: [starters/react-native-starter/App.js](starters/react-native-starter/App.js)
+- Flutter starter: [starters/flutter-starter/lib/main.dart](starters/flutter-starter/lib/main.dart)
+
+These starters are designed for a first successful payment flow:
+
+1. Configure base URL and API key.
+2. Call `POST /api/Payment`.
+3. Use `transactionId` for status follow-up.
+
 ## Tech Stack
 
 - **React 18** - Frontend framework

@@ -16,14 +16,18 @@ import Webhooks from './pages/Webhooks';
 import Analytics from './pages/Analytics';
 import ProvidersHealth from './pages/ProvidersHealth';
 import Escrow from './pages/Escrow';
+import Settlements from './pages/Settlements';
+import Traceability from './pages/Traceability';
 import MerchantProfile from './pages/MerchantProfile';
 import PortalSelect from './pages/PortalSelect';
-import DeveloperPortal from './pages/DeveloperPortal';
-import PaymentSimulator from './pages/PaymentSimulator';
+import LandingPage from './pages/LandingPage';
+const DeveloperPortal  = React.lazy(() => import('./pages/DeveloperPortal'));
+const PaymentSimulator = React.lazy(() => import('./pages/PaymentSimulator'));
+const WebshopPublicDemo = React.lazy(() => import('./pages/WebshopPublicDemo'));const IntegrationGuides = React.lazy(() => import('./pages/IntegrationGuides'));import AdminConfig from './pages/AdminConfig';
 
 function HomeRedirect() {
   const { isAuthenticated, isSuperAdmin } = useAuth();
-  if (!isAuthenticated) return <Navigate to="/choose-portal" replace />;
+  if (!isAuthenticated) return <Navigate to="/" replace />;
   return <Navigate to={isSuperAdmin ? '/admin' : '/merchant'} replace />;
 }
 
@@ -56,13 +60,15 @@ function App() {
           error:   { iconTheme: { primary: '#C02020', secondary: '#FEE8E8' } },
         }}
       />
+      <React.Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center', color: '#999', fontSize: '13px' }}>Chargement...</div>}>
       <Routes>
         <Route path="/login"          element={<Navigate to="/choose-portal" replace />} />
         <Route path="/choose-portal"  element={<PortalSelect />} />
         <Route path="/merchant/login" element={<Login portal="merchant" />} />
         <Route path="/admin/login"    element={<Login portal="admin" />} />
         <Route path="/register"       element={<MerchantRegister />} />
-        <Route path="/" element={<HomeRedirect />} />
+        <Route path="/demo/webshop"   element={<WebshopPublicDemo />} />
+        <Route path="/" element={<LandingPage />} />
 
         <Route path="/admin" element={<RequireAuth><RequireRole role="super_admin"><DashboardLayout /></RequireRole></RequireAuth>}>
           <Route index element={<Overview />} />
@@ -72,9 +78,9 @@ function App() {
           <Route path="analytics"    element={<RequirePermission permission={['analytics.view_own','analytics.view_all']}><Analytics /></RequirePermission>} />
           <Route path="providers"    element={<RequirePermission permission="providers.view_health"><ProvidersHealth /></RequirePermission>} />
           <Route path="escrow"       element={<RequirePermission permission={['escrow.view_own','escrow.release_manual']}><Escrow /></RequirePermission>} />
-          <Route path="profile"      element={<RequirePermission permission="merchants.view_own"><MerchantProfile /></RequirePermission>} />
-          <Route path="developer"    element={<RequirePermission permission="merchants.view_own"><DeveloperPortal /></RequirePermission>} />
-          <Route path="simulator"    element={<RequirePermission permission="merchants.view_own"><PaymentSimulator /></RequirePermission>} />
+          <Route path="settlements"  element={<RequirePermission permission={['settlements.view_all','settlements.view_own']}><Settlements /></RequirePermission>} />
+          <Route path="traceability" element={<RequirePermission permission="settlements.view_all"><Traceability /></RequirePermission>} />
+          <Route path="config"       element={<RequirePermission permission="fees.configure"><AdminConfig /></RequirePermission>} />
         </Route>
 
         <Route path="/merchant" element={<RequireAuth><RequireRole role="merchant"><DashboardLayout /></RequireRole></RequireAuth>}>
@@ -84,14 +90,17 @@ function App() {
           <Route path="analytics"    element={<RequirePermission permission={['analytics.view_own','analytics.view_all']}><Analytics /></RequirePermission>} />
           <Route path="providers"    element={<RequirePermission permission="providers.view_health"><ProvidersHealth /></RequirePermission>} />
           <Route path="escrow"       element={<RequirePermission permission={['escrow.view_own','escrow.release_manual']}><Escrow /></RequirePermission>} />
+          <Route path="settlements"  element={<RequirePermission permission={['settlements.view_all','settlements.view_own']}><Settlements /></RequirePermission>} />
           <Route path="profile"      element={<RequirePermission permission="merchants.view_own"><MerchantProfile /></RequirePermission>} />
           <Route path="developer"    element={<RequirePermission permission="merchants.view_own_keys"><DeveloperPortal /></RequirePermission>} />
           <Route path="simulator"    element={<RequirePermission permission="merchants.view_own_keys"><PaymentSimulator /></RequirePermission>} />
+          <Route path="guides"       element={<RequirePermission permission="merchants.view_own"><IntegrationGuides /></RequirePermission>} />
 
         </Route>
 
         <Route path="*" element={<HomeRedirect />} />
       </Routes>
+      </React.Suspense>
     </Router>
   );
 }

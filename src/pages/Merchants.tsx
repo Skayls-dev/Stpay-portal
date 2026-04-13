@@ -134,6 +134,11 @@ export default function Merchants() {
 
   const columns: DataTableColumn<Merchant>[] = [
     {
+      key: 'merchant',
+      header: 'Marchand',
+      render: (m) => <span className="text-sm text-slate-700">{m.merchantName || m.merchantId || 'Mon compte'}</span>,
+    },
+    {
       key: 'mode',
       header: 'Type',
       render: (m) => (

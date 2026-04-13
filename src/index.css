@@ -76,6 +76,36 @@
 }
 
 @layer components {
+  .admin-skin {
+    --bg-page:      #F2F5FB;
+    --bg-card:      #FFFFFF;
+    --bg-subtle:    #F7F9FD;
+    --bg-hover:     #EEF3FC;
+
+    --border:       #DEE5F2;
+    --border-med:   #CED8EB;
+    --border-soft:  #EAF0FA;
+
+    --text-1:       #121A2B;
+    --text-2:       #4A5876;
+    --text-3:       #7C8AA6;
+    --text-4:       #A3AFC6;
+
+    /* Admin accent uses blue family to clearly differ from merchant orange mood */
+    --orange:       #1F6FEB;
+    --orange-dark:  #1259C3;
+    --orange-bg:    #EAF2FF;
+    --orange-border:#C7DBFF;
+  }
+
+  .admin-skin .panel {
+    box-shadow: 0 1px 0 rgba(13, 31, 77, 0.03);
+  }
+
+  .admin-skin .nav-item.active {
+    box-shadow: inset 0 0 0 1px rgba(31, 111, 235, 0.1);
+  }
+
   /* ── Typography ── */
   .font-mono-st { font-family: 'DM Mono', monospace; }
 

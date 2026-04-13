@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>ST Pay - Guide Companion Apps & Wearables</title>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f8f9fb; color: #222; margin: 0; padding: 0; }
+    .container { max-width: 900px; margin: 32px auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #0001; padding: 32px; }
+    h1, h2, h3 { color: #1a237e; }
+    pre, code { background: #f4f4f4; border-radius: 4px; padding: 8px; font-size: 15px; }
+    .mermaid { background: #f9f9f9; border-radius: 4px; margin: 16px 0; }
+    .tips { background: #e3f2fd; border-left: 4px solid #1976d2; padding: 12px 18px; margin: 18px 0; border-radius: 4px; }
+    .platform { font-weight: bold; color: #388e3c; }
+  </style>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true });
+  </script>
+</head>
+<body>
+<div class="container">
+  <h1>ST Pay – Guide Companion Apps & Wearables</h1>
+  <p>Ce guide explique comment intégrer ST Pay sur smartwatch via une app compagnon mobile, avec des scénarios détaillés, diagrammes de séquence et exemples de code pour Android et iOS.</p>
+
+  <h2>Scénario 1 : Paiement initié depuis la montre</h2>
+  <ol>
+    <li>L’utilisateur lance un paiement sur la montre.</li>
+    <li>La montre transmet la demande à l’app mobile (DataLayer/WatchConnectivity).</li>
+    <li>L’app mobile appelle l’API ST Pay (<code>POST /api/Payment</code>) avec la clé API.</li>
+    <li>L’app mobile transmet le statut à la montre (QR, code, attente…).</li>
+    <li>À la fin, la montre affiche le statut final.</li>
+  </ol>
+  <div class="mermaid">
+    sequenceDiagram
+      participant Watch as Montre connectée
+      participant Mobile as App mobile compagnon
+      participant API as API ST Pay
+      Watch->>Mobile: Demande de paiement (montant, ref...)
+      Mobile->>API: POST /api/Payment (clé API)
+      API-->>Mobile: Statut paiement (en attente)
+      Mobile-->>Watch: Affiche statut (QR, code, attente)
+      Note over Watch,Mobile: La montre ne détient jamais la clé API
+      API-->>Mobile: Statut final (succès/échec)
+      Mobile-->>Watch: Affiche statut final
+  </div>
+
+  <h2>Scénario 2 : Synchronisation du statut paiement</h2>
+  <div class="mermaid">
+    sequenceDiagram
+      participant Watch as Montre connectée
+      participant Mobile as App mobile compagnon
+      participant API as API ST Pay
+      loop Synchronisation statut
+        API-->>Mobile: Statut paiement (polling ou push)
+        Mobile-->>Watch: Statut mis à jour (succès, échec, attente)
+      end
+      Note over Watch,Mobile: La montre ne contacte jamais l’API directement
+  </div>
+
+  <h2>Scénario 3 : Annulation depuis la montre</h2>
+  <ol>
+    <li>L’utilisateur appuie sur “Annuler” sur la montre.</li>
+    <li>La montre envoie la commande à l’app mobile.</li>
+    <li>L’app mobile appelle <code>DELETE /api/Payment/{id}</code> à l’API ST Pay.</li>
+    <li>L’app mobile transmet le statut d’annulation à la montre.</li>
+  </ol>
+
+  <h2>Exemples de code</h2>
+  <h3 class="platform">Android (Wear OS + Mobile)</h3>
+  <pre><code>// Sur la montre (Wear OS) — Kotlin
+val request = "PAYMENT_REQUEST|amount=5000;ref=ORDER123"
+val nodeId = ... // ID du mobile appairé
+Wearable.getMessageClient(context)
+    .sendMessage(nodeId, "/stpay/payment", request.toByteArray())
+
+// Sur le mobile (Android) — Kotlin
+override fun onMessageReceived(event: MessageEvent) {
+    if (event.path == "/stpay/payment") {
+        val data = String(event.data)
+        // Parse et appelle l’API ST Pay
+        val response = apiClient.processPayment(/* ... */)
+        // Renvoie le statut à la montre
+        sendStatusToWatch(response.status)
+    }
+}
+
+// Appel API ST Pay (mobile)
+val response = apiClient.processPayment(
+    amount = 5000,
+    currency = "XAF",
+    provider = "MTN",
+    // ...autres champs requis
+)
+
+// Transmission du statut à la montre
+val statusMsg = "STATUS|pending"
+Wearable.getMessageClient(context)
+    .sendMessage(nodeId, "/stpay/status", statusMsg.toByteArray())
+
+// Affichage du statut sur la montre
+override fun onMessageReceived(event: MessageEvent) {
+    if (event.path == "/stpay/status") {
+        val status = String(event.data)
+        // Afficher à l’utilisateur (succès, échec, attente…)
+    }
+}
+</code></pre>
+
+  <h3 class="platform">iOS (WatchConnectivity)</h3>
+  <pre><code>// Sur la montre (watchOS)
+let message = ["type": "payment_request", "amount": 5000, "ref": "ORDER123"]
+WCSession.default.sendMessage(message, replyHandler: nil, errorHandler: nil)
+
+// Sur le mobile (iOS)
+func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
+    if message["type"] as? String == "payment_request" {
+        // Appel API ST Pay ici
+        // ...
+        // Envoi du statut à la montre
+        let statusMsg = ["type": "status", "status": "pending"]
+        session.sendMessage(statusMsg, replyHandler: nil, errorHandler: nil)
+    }
+}
+
+// Affichage du statut sur la montre
+func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
+    if message["type"] as? String == "status" {
+        let status = message["status"] as? String
+        // Afficher à l’utilisateur
+    }
+}
+</code></pre>
+
+  <div class="tips">
+    <strong>Conseils pour développeurs juniors :</strong>
+    <ul>
+      <li>Ne jamais stocker la clé API sur la montre : toujours côté mobile.</li>
+      <li>Bien gérer les erreurs : perte de connexion, refus API, etc.</li>
+      <li>Tester la communication montre ↔ mobile avant l’API.</li>
+      <li>Utiliser les snippets fournis pour chaque plateforme.</li>
+    </ul>
+  </div>
+</div>
+</body>
+</html>

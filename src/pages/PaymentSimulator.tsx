@@ -4,9 +4,20 @@
 // L'utilisateur contrôle manuellement la réponse téléphone (confirmer / refuser / timeout)
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import client from '../lib/api/client'
+import {
+  PAYMENT_POLL_INTERVAL_MS,
+  PAYMENT_POLL_MAX_ATTEMPTS,
+  buildEscrowPayload,
+  buildPaymentInitiationPayload,
+  isFailedPaymentStatus,
+  isSuccessfulPaymentStatus,
+  normalizePaymentStatus,
+  providersHealthApi,
+  type EscrowReleaseMode,
+} from '../lib/api/modules'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -26,7 +37,11 @@ interface PaymentForm {
   name: string
   ref: string
   description: string
+  provider: string
+  orangePin: string
   scenario: 'success' | 'failure' | 'timeout'
+  escrowEnabled: boolean
+  escrowMode: EscrowReleaseMode
 }
 
 interface LogEntry {
@@ -41,6 +56,13 @@ interface TxResult {
   status: string
   amount: number
   duration: number
+  escrow?: {
+    escrowId?: string
+    status?: string
+    releaseMode?: string
+    pickupCode?: string
+    autoReleaseAt?: string
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -55,25 +77,54 @@ function nowTime() {
   })
 }
 
-async function initiatePayment(form: PaymentForm, apiKey: string) {
-  const res = await client.post('/api/Payment', {
-    amount:   form.amount,
+async function initiatePayment(form: PaymentForm) {
+  const escrow = buildEscrowPayload({
+    enabled: form.escrowEnabled,
+    releaseMode: form.escrowMode,
+    autoTimeoutDays: 7,
+  })
+
+  const metadata: Record<string, unknown> = {
+    simulatorMode: true,
+    scenario: form.scenario,
+  }
+
+  if (form.provider === 'ORANGE') {
+    metadata.pin = form.orangePin
+  }
+
+  const payload = buildPaymentInitiationPayload({
+    amount: form.amount,
     currency: 'XAF',
-    provider: 'MOCK',
+    provider: form.provider,
     customer: {
       phoneNumber: form.phone,
-      name:        form.name,
-      email:       'test@stpay.local',
+      name: form.name,
+      email: 'test@stpay.local',
     },
     merchant: {
-      reference:   form.ref,
+      reference: form.ref,
       callbackUrl: `${window.location.origin}/callback`,
-      name:        'ST Pay Simulator',
+      name: 'ST Pay Simulator',
     },
     description: form.description,
-    metadata: { simulatorMode: true, scenario: form.scenario },
+    metadata,
+    escrow,
   })
-  return res.data as { transactionId?: string; id?: string; providerReference?: string }
+
+  const res = await client.post('/api/Payment', payload)
+  return res.data as {
+    transactionId?: string
+    id?: string
+    providerReference?: string
+    escrow?: {
+      escrowId?: string
+      status?: string
+      releaseMode?: string
+      pickupCode?: string
+      autoReleaseAt?: string
+    }
+  }
 }
 
 async function fetchStatus(txId: string) {
@@ -156,6 +207,7 @@ type PhoneScreen = 'idle' | 'ussd' | 'processing' | 'success' | 'failed' | 'canc
 
 interface PhoneProps {
   screen:    PhoneScreen
+  provider:  string
   txId?:     string
   amount?:   number
   ref_?:     string
@@ -168,10 +220,118 @@ interface PhoneProps {
 }
 
 function SimulatedPhone({
-  screen, txId, amount, ref_, desc,
+  screen, provider, txId, amount, ref_, desc,
   onConfirm, onCancel, onReset,
   polling, pollCount,
 }: PhoneProps) {
+  const providerKey = String(provider || 'MTN').toUpperCase()
+  const brand = {
+    MTN: {
+      networkLabel: 'MTN CM',
+      walletLabel: 'MTN MoMo',
+      promptTitle: 'MTN Mobile Money',
+      ussdCode: '*126#',
+      primary: '#FFD700',
+      panel: '#FFFDE7',
+      amountBorder: '#E0D800',
+      chassisBg: '#1C1C12',
+      chassisBorder: '#5D5312',
+      notchBg: '#4A4210',
+      keypadBg: '#19180F',
+      keypadKeyBg: '#2D2B1D',
+      keypadKeyText: '#FFF8CC',
+      delKeyBg: '#3B2F11',
+      delKeyText: '#FFCB4D',
+      hashKeyBg: '#1A2740',
+      hashKeyText: '#7CB8FF',
+      okKeyBg: '#1E5B1E',
+      okKeyText: '#8DFF8D',
+    },
+    ORANGE: {
+      networkLabel: 'ORANGE CM',
+      walletLabel: 'Orange Money',
+      promptTitle: 'Orange Money',
+      ussdCode: '#150#',
+      primary: '#FF7900',
+      panel: '#FFF3E8',
+      amountBorder: '#F6A95B',
+      chassisBg: '#1D1712',
+      chassisBorder: '#6E3D16',
+      notchBg: '#5B3212',
+      keypadBg: '#1D1510',
+      keypadKeyBg: '#352218',
+      keypadKeyText: '#FFE2CC',
+      delKeyBg: '#4A2313',
+      delKeyText: '#FFB385',
+      hashKeyBg: '#2D1F12',
+      hashKeyText: '#FFC085',
+      okKeyBg: '#6B2F06',
+      okKeyText: '#FFD2A8',
+    },
+    WAVE: {
+      networkLabel: 'WAVE CM',
+      walletLabel: 'Wave',
+      promptTitle: 'Wave Money',
+      ussdCode: '*444#',
+      primary: '#00C2FF',
+      panel: '#EAF8FF',
+      amountBorder: '#79D7FF',
+      chassisBg: '#111A1D',
+      chassisBorder: '#12617A',
+      notchBg: '#0F5166',
+      keypadBg: '#0F1C22',
+      keypadKeyBg: '#18303A',
+      keypadKeyText: '#CCF3FF',
+      delKeyBg: '#1C3640',
+      delKeyText: '#88DFFF',
+      hashKeyBg: '#143144',
+      hashKeyText: '#80D9FF',
+      okKeyBg: '#0F4B5C',
+      okKeyText: '#8CF3FF',
+    },
+    MOOV: {
+      networkLabel: 'MOOV CM',
+      walletLabel: 'Moov Money',
+      promptTitle: 'Moov Money',
+      ussdCode: '*555#',
+      primary: '#0DB14B',
+      panel: '#EAF9EF',
+      amountBorder: '#7EDDA3',
+      chassisBg: '#101B13',
+      chassisBorder: '#1B6635',
+      notchBg: '#15592E',
+      keypadBg: '#102016',
+      keypadKeyBg: '#1B3525',
+      keypadKeyText: '#D1FFE2',
+      delKeyBg: '#284131',
+      delKeyText: '#8CE2A8',
+      hashKeyBg: '#143622',
+      hashKeyText: '#8EE9B0',
+      okKeyBg: '#165732',
+      okKeyText: '#A2FFCA',
+    },
+  }[providerKey] ?? {
+    networkLabel: `${providerKey} CM`,
+    walletLabel: providerKey,
+    promptTitle: providerKey,
+    ussdCode: '*000#',
+    primary: '#9CA3AF',
+    panel: '#F3F4F6',
+    amountBorder: '#D1D5DB',
+    chassisBg: '#1A1A1A',
+    chassisBorder: '#333333',
+    notchBg: '#333333',
+    keypadBg: '#111111',
+    keypadKeyBg: '#2A2A2A',
+    keypadKeyText: '#FFFFFF',
+    delKeyBg: '#3A2A1A',
+    delKeyText: '#F59E0B',
+    hashKeyBg: '#0A1A3A',
+    hashKeyText: '#3B82F6',
+    okKeyBg: '#0A3A0A',
+    okKeyText: '#22C55E',
+  }
+
   const [pin, setPin] = useState('')
   const [pinError, setPinError] = useState(false)
 
@@ -217,13 +377,14 @@ function SimulatedPhone({
       {/* Phone chassis */}
       <div style={{
         width: 240,
-        background: '#1A1A1A',
+        background: brand.chassisBg,
         borderRadius: 36,
         padding: '14px 10px',
-        border: '3px solid #333',
+        border: `3px solid ${brand.chassisBorder}`,
+        boxShadow: `0 0 0 1px ${brand.primary}33, 0 14px 30px rgba(0, 0, 0, 0.45)`,
       }}>
         {/* Notch */}
-        <div style={{ width: 70, height: 8, background: '#333', borderRadius: 4, margin: '0 auto 10px' }} />
+        <div style={{ width: 70, height: 8, background: brand.notchBg, borderRadius: 4, margin: '0 auto 10px' }} />
 
         {/* Screen */}
         <div style={{ background: '#000', borderRadius: 20, overflow: 'hidden', minHeight: 300 }}>
@@ -239,7 +400,7 @@ function SimulatedPhone({
                 <div key={h} style={{ width: 3, height: h, background: 'white', borderRadius: 1 }} />
               ))}
             </div>
-            <span style={{ letterSpacing: 1 }}>MTN CM</span>
+            <span style={{ letterSpacing: 1 }}>{brand.networkLabel}</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9 }}>
               <span>4G</span>
               <div style={{ width: 18, height: 9, border: '1.5px solid white', borderRadius: 2, display: 'flex', alignItems: 'center', padding: '1px 1.5px' }}>
@@ -253,7 +414,7 @@ function SimulatedPhone({
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#000', padding: '28px 16px', minHeight: 220 }}>
               <div style={{ fontSize: 30, fontWeight: 300, color: 'white', fontFamily: 'DM Mono, monospace', letterSpacing: 3 }}>{clockTime}</div>
               <div style={{ fontSize: 10, color: '#666', fontFamily: 'DM Mono, monospace', marginTop: 4, textAlign: 'center' }}>{clockDate}</div>
-              <div style={{ marginTop: 20, background: '#FFD700', color: '#000', fontSize: 10, fontWeight: 700, padding: '4px 14px', borderRadius: 3, letterSpacing: 1, fontFamily: 'DM Mono, monospace' }}>MTN MoMo</div>
+              <div style={{ marginTop: 20, background: brand.primary, color: '#000', fontSize: 10, fontWeight: 700, padding: '4px 14px', borderRadius: 3, letterSpacing: 1, fontFamily: 'DM Mono, monospace' }}>{brand.walletLabel}</div>
               <div style={{ marginTop: 8, fontSize: 9, color: '#444', fontFamily: 'DM Mono, monospace', textAlign: 'center' }}>En attente d'une requête USSD...</div>
             </div>
           )}
@@ -261,10 +422,10 @@ function SimulatedPhone({
           {/* USSD prompt */}
           {screen === 'ussd' && (
             <div style={{ display: 'flex', flexDirection: 'column', background: '#000', padding: '8px 8px 10px' }}>
-              <div style={{ background: '#FFD700', padding: '6px 10px', borderRadius: '4px 4px 0 0', fontSize: 11, fontWeight: 700, color: '#000', fontFamily: 'DM Mono, monospace', textAlign: 'center' }}>
-                MTN Mobile Money — *126#
+              <div style={{ background: brand.primary, padding: '6px 10px', borderRadius: '4px 4px 0 0', fontSize: 11, fontWeight: 700, color: '#000', fontFamily: 'DM Mono, monospace', textAlign: 'center' }}>
+                {brand.promptTitle} — {brand.ussdCode}
               </div>
-              <div style={{ background: '#FFFDE7', padding: '10px', borderRadius: '0 0 4px 4px', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#000', lineHeight: 1.6 }}>
+              <div style={{ background: brand.panel, padding: '10px', borderRadius: '0 0 4px 4px', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#000', lineHeight: 1.6 }}>
                 <div style={{ fontWeight: 700, marginBottom: 3 }}>PAIEMENT MOBILE MONEY</div>
                 <div style={{ fontSize: 9, color: '#555', marginBottom: 2 }}>Transaction ID:</div>
                 <div style={{ fontSize: 9, wordBreak: 'break-all', marginBottom: 6, color: '#333' }}>
@@ -272,7 +433,7 @@ function SimulatedPhone({
                 </div>
                 <div style={{ fontSize: 10, color: '#555' }}>Marchand:</div>
                 <div style={{ fontSize: 11, fontWeight: 700 }}>{ref_}</div>
-                <div style={{ textAlign: 'center', fontSize: 15, fontWeight: 700, borderTop: '1px solid #E0D800', borderBottom: '1px solid #E0D800', padding: '5px 0', margin: '6px 0' }}>
+                <div style={{ textAlign: 'center', fontSize: 15, fontWeight: 700, borderTop: `1px solid ${brand.amountBorder}`, borderBottom: `1px solid ${brand.amountBorder}`, padding: '5px 0', margin: '6px 0' }}>
                   {amount ? fmtXAF(amount) : '—'}
                 </div>
                 <div style={{ fontSize: 10, color: '#555', marginBottom: 2 }}>Motif:</div>
@@ -307,10 +468,10 @@ function SimulatedPhone({
           {/* Processing */}
           {screen === 'processing' && (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#000', padding: 20, minHeight: 220, textAlign: 'center' }}>
-              <div style={{ width: 44, height: 44, border: '3px solid #FFD700', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .8s linear infinite', margin: '0 auto 14px' }} />
-              <div style={{ color: '#FFD700', fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700 }}>TRAITEMENT...</div>
+              <div style={{ width: 44, height: 44, border: `3px solid ${brand.primary}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .8s linear infinite', margin: '0 auto 14px' }} />
+              <div style={{ color: brand.primary, fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700 }}>TRAITEMENT...</div>
               <div style={{ color: '#888', fontFamily: 'DM Mono, monospace', fontSize: 10, marginTop: 6 }}>
-                {polling ? `Poll #${pollCount} en cours...` : 'Validation MTN MoMo'}
+                {polling ? `Poll #${pollCount} en cours...` : `Validation ${brand.walletLabel}`}
               </div>
             </div>
           )}
@@ -325,8 +486,8 @@ function SimulatedPhone({
               </div>
               <div style={{ color: '#22C55E', fontFamily: 'DM Mono, monospace', fontSize: 13, fontWeight: 700, marginBottom: 6 }}>PAIEMENT RÉUSSI</div>
               <div style={{ color: '#22C55E', fontFamily: 'DM Mono, monospace', fontSize: 15, fontWeight: 700 }}>{amount ? fmtXAF(amount) : ''}</div>
-              <div style={{ color: '#555', fontFamily: 'DM Mono, monospace', fontSize: 9, marginTop: 8 }}>débités sur votre compte MTN MoMo</div>
-              <div style={{ marginTop: 12, background: '#FFD700', color: '#000', fontSize: 9, fontWeight: 700, padding: '3px 10px', borderRadius: 2, fontFamily: 'DM Mono, monospace', letterSpacing: 1 }}>MTN MoMo</div>
+              <div style={{ color: '#555', fontFamily: 'DM Mono, monospace', fontSize: 9, marginTop: 8 }}>{`débités sur votre compte ${brand.walletLabel}`}</div>
+              <div style={{ marginTop: 12, background: brand.primary, color: '#000', fontSize: 9, fontWeight: 700, padding: '3px 10px', borderRadius: 2, fontFamily: 'DM Mono, monospace', letterSpacing: 1 }}>{brand.walletLabel}</div>
             </div>
           )}
 
@@ -349,23 +510,23 @@ function SimulatedPhone({
         </div>
 
         {/* Keypad */}
-        <div style={{ background: '#111', padding: 8, borderRadius: '0 0 20px 20px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 5, marginTop: 0 }}>
+        <div style={{ background: brand.keypadBg, padding: 8, borderRadius: '0 0 20px 20px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 5, marginTop: 0 }}>
           {['1','2','3','4','5','6','7','8','9'].map((k) => (
             <button key={k} onClick={() => dialKey(k)}
-                    style={{ background: '#2A2A2A', border: 'none', borderRadius: 6, color: 'white', fontFamily: 'DM Mono, monospace', fontSize: 14, fontWeight: 700, padding: '8px 0', cursor: 'pointer' }}>
+                    style={{ background: brand.keypadKeyBg, border: 'none', borderRadius: 6, color: brand.keypadKeyText, fontFamily: 'DM Mono, monospace', fontSize: 14, fontWeight: 700, padding: '8px 0', cursor: 'pointer' }}>
               {k}
             </button>
           ))}
           <button onClick={handleDel}
-                  style={{ background: '#3A2A1A', border: 'none', borderRadius: 6, color: '#F59E0B', fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, padding: '8px 0', cursor: 'pointer' }}>
+                  style={{ background: brand.delKeyBg, border: 'none', borderRadius: 6, color: brand.delKeyText, fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, padding: '8px 0', cursor: 'pointer' }}>
             ⌫
           </button>
           <button onClick={() => dialKey('0')}
-                  style={{ background: '#2A2A2A', border: 'none', borderRadius: 6, color: 'white', fontFamily: 'DM Mono, monospace', fontSize: 14, fontWeight: 700, padding: '8px 0', cursor: 'pointer' }}>
+                  style={{ background: brand.keypadKeyBg, border: 'none', borderRadius: 6, color: brand.keypadKeyText, fontFamily: 'DM Mono, monospace', fontSize: 14, fontWeight: 700, padding: '8px 0', cursor: 'pointer' }}>
             0
           </button>
           <button onClick={screen === 'ussd' ? handleConfirm : onReset}
-                  style={{ background: screen === 'ussd' ? '#0A3A0A' : '#1A1A1A', border: 'none', borderRadius: 6, color: screen === 'ussd' ? '#22C55E' : '#555', fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, padding: '8px 0', cursor: 'pointer' }}>
+                  style={{ background: screen === 'ussd' ? brand.okKeyBg : '#1A1A1A', border: 'none', borderRadius: 6, color: screen === 'ussd' ? brand.okKeyText : '#555', fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, padding: '8px 0', cursor: 'pointer' }}>
             OK
           </button>
           <button onClick={screen === 'ussd' ? onCancel : onReset}
@@ -373,7 +534,7 @@ function SimulatedPhone({
             ✕
           </button>
           <button
-                  style={{ background: '#0A1A3A', border: 'none', borderRadius: 6, color: '#3B82F6', fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, padding: '8px 0', cursor: 'pointer' }}>
+                  style={{ background: brand.hashKeyBg, border: 'none', borderRadius: 6, color: brand.hashKeyText, fontFamily: 'DM Mono, monospace', fontSize: 11, fontWeight: 700, padding: '8px 0', cursor: 'pointer' }}>
             #
           </button>
         </div>
@@ -396,7 +557,16 @@ function SimulatedPhone({
 
 function ResultCard({ result }: { result: TxResult | null }) {
   if (!result) return null
-  const ok = ['SUCCESSFUL','SUCCESS','COMPLETED'].some(s => result.status.toUpperCase().includes(s))
+  const ok = isSuccessfulPaymentStatus(result.status)
+  const copyPickupCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code)
+      toast.success('Code copié')
+    } catch {
+      toast.error('Impossible de copier le code')
+    }
+  }
+
   const rows: [string, React.ReactNode][] = [
     ['Transaction ID', <span className="font-mono text-[11px] break-all">{result.txId}</span>],
     ['Statut final',   <span className={ok ? 'text-[var(--green)] font-bold' : 'text-[var(--red)] font-bold'}>{result.status}</span>],
@@ -417,6 +587,49 @@ function ResultCard({ result }: { result: TxResult | null }) {
             <span className="text-[12px] text-[var(--text-1)] text-right">{v}</span>
           </div>
         ))}
+
+        {result.escrow && (
+          <>
+            <div className="px-4 py-2.5 bg-[var(--bg-subtle)]">
+              <span className="text-[11px] font-semibold text-[var(--text-2)]">Escrow</span>
+            </div>
+            <div className="flex items-start justify-between gap-4 px-4 py-2.5">
+              <span className="text-[11px] text-[var(--text-3)] flex-shrink-0 w-28">Escrow ID</span>
+              <span className="text-[12px] text-[var(--text-1)] text-right font-mono break-all">{result.escrow.escrowId || '—'}</span>
+            </div>
+            <div className="flex items-start justify-between gap-4 px-4 py-2.5">
+              <span className="text-[11px] text-[var(--text-3)] flex-shrink-0 w-28">Statut escrow</span>
+              <span className="text-[12px] text-[var(--text-1)] text-right">{result.escrow.status || '—'}</span>
+            </div>
+            <div className="flex items-start justify-between gap-4 px-4 py-2.5">
+              <span className="text-[11px] text-[var(--text-3)] flex-shrink-0 w-28">Mode</span>
+              <span className="text-[12px] text-[var(--text-1)] text-right">{result.escrow.releaseMode || '—'}</span>
+            </div>
+
+            {result.escrow.pickupCode && (
+              <>
+                <div className="flex items-start justify-between gap-4 px-4 py-2.5">
+                  <span className="text-[11px] text-[var(--text-3)] flex-shrink-0 w-28">Code de retrait</span>
+                  <div className="text-right space-y-2">
+                    <span className="font-mono text-gold text-lg tracking-widest">{result.escrow.pickupCode}</span>
+                    <div>
+                      <button
+                        type="button"
+                        className="btn-secondary text-[11px]"
+                        onClick={() => copyPickupCode(result.escrow!.pickupCode!)}
+                      >
+                        Copier le code
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="px-4 py-2.5 text-[11px] text-[var(--amber)] bg-[var(--amber-bg)] border-t border-[var(--amber-border)]">
+                  Ce code ne sera plus affiché. Transmettez-le à l'acheteur.
+                </div>
+              </>
+            )}
+          </>
+        )}
       </div>
     </div>
   )
@@ -439,11 +652,30 @@ const SCENARIOS = [
   { value: 'timeout', label: 'Timeout (60s)',   sub: 'Simule une absence de réponse' },
 ] as const
 
+const PROVIDER_LABELS: Record<string, string> = {
+  MTN: 'MTN Mobile Money',
+  ORANGE: 'Orange Money',
+  WAVE: 'Wave',
+  MOOV: 'Moov Africa',
+}
+
+const DEFAULT_PROVIDER_OPTIONS = [
+  { name: 'MTN', supportedFeatures: [] },
+  { name: 'ORANGE', supportedFeatures: [] },
+  { name: 'WAVE', supportedFeatures: [] },
+  { name: 'MOOV', supportedFeatures: [] },
+]
+
+function providerLabel(name: string) {
+  return PROVIDER_LABELS[name] ?? name
+}
+
 export default function PaymentSimulator() {
   const [state, setState] = useState<SimState>('idle')
   const [form, setForm] = useState<PaymentForm>({
     amount: 5000, phone: '237677123456', name: 'Jean Dupont',
-    ref: 'TEST_SIM_001', description: 'Paiement test ST Pay', scenario: 'success',
+    ref: 'TEST_SIM_001', description: 'Paiement test ST Pay', provider: 'MTN', orangePin: '1234', scenario: 'success',
+    escrowEnabled: false, escrowMode: 'pickup_code',
   })
   const [txId,      setTxId]      = useState<string | null>(null)
   const [startedAt, setStartedAt] = useState<number>(0)
@@ -455,6 +687,36 @@ export default function PaymentSimulator() {
   const [pollCount, setPollCount] = useState(0)
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const { data: _dynamicProviders } = useQuery({
+    queryKey: ['simulator-providers'],
+    queryFn: () => providersHealthApi.listProviders(),
+    staleTime: 5 * 60_000,
+  })
+  const providerOptions = React.useMemo(() => {
+    const merged = [...DEFAULT_PROVIDER_OPTIONS, ...(_dynamicProviders ?? [])]
+    const unique = new Map<string, { name: string; supportedFeatures: string[] }>()
+    merged.forEach((item) => {
+      const key = String(item.name || '').toUpperCase()
+      if (!key) return
+      if (!unique.has(key)) {
+        unique.set(key, {
+          name: key,
+          supportedFeatures: Array.isArray(item.supportedFeatures) ? item.supportedFeatures : [],
+        })
+      }
+    })
+    return Array.from(unique.values())
+  }, [_dynamicProviders])
+
+  useEffect(() => {
+    if (!providerOptions.some((option) => option.name === form.provider)) {
+      setForm((prev) => ({
+        ...prev,
+        provider: providerOptions[0]?.name ?? 'MTN',
+      }))
+    }
+  }, [providerOptions, form.provider])
 
   const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
     setLogs((prev) => [...prev, { time: nowTime(), message, type }])
@@ -493,23 +755,23 @@ export default function PaymentSimulator() {
       addLog(`Poll #${count} — GET /api/Payment/${tid.slice(-8)}...`, 'info')
       try {
         const data = await fetchStatus(tid)
-        const st = (data.status || data.Status || '').toUpperCase()
-        addLog(`Statut reçu: ${st}`, ['SUCCESSFUL','SUCCESS','COMPLETED'].some(s => st.includes(s)) ? 'ok' : 'info')
+        const st = normalizePaymentStatus(data.status || data.Status)
+        addLog(`Statut reçu: ${st}`, isSuccessfulPaymentStatus(st) ? 'ok' : 'info')
 
-        if (['SUCCESSFUL','SUCCESS','COMPLETED'].some(s => st.includes(s))) {
+        if (isSuccessfulPaymentStatus(st)) {
           stopPolling()
           setState('success')
           setResult({ txId: tid, providerRef: data.providerReference, status: st, amount: form.amount, duration: Date.now() - startedAt })
           addLog('Webhook payment.completed déclenché', 'ok')
           addLog('Transaction terminée avec succès !', 'ok')
           toast.success('Paiement confirmé !')
-        } else if (['FAILED','ERROR','REJECTED','CANCELLED'].some(s => st.includes(s))) {
+        } else if (isFailedPaymentStatus(st)) {
           stopPolling()
           setState('failed')
           setResult({ txId: tid, status: st, amount: form.amount, duration: Date.now() - startedAt })
           addLog('Webhook payment.failed déclenché', 'err')
           toast.error('Transaction échouée')
-        } else if (count >= 12) {
+        } else if (count >= PAYMENT_POLL_MAX_ATTEMPTS) {
           stopPolling()
           setState('timeout')
           addLog('Timeout — 60s sans réponse définitive', 'warn')
@@ -518,24 +780,43 @@ export default function PaymentSimulator() {
       } catch (e: unknown) {
         addLog(`Erreur polling: ${e instanceof Error ? e.message : String(e)}`, 'err')
       }
-    }, 5000)
+    }, PAYMENT_POLL_INTERVAL_MS)
   }
 
   // Initiate payment
   const initMutation = useMutation({
-    mutationFn: () => initiatePayment(form, localStorage.getItem('stpay_api_key') || 'sk_test_local_stpay_2026'),
+    mutationFn: () => initiatePayment(form),
     onMutate: () => {
       setState('initiating')
       setStartedAt(Date.now())
       addLog(`Initiation paiement — ${fmtXAF(form.amount)} → ${form.phone}`, 'info')
-      addLog('POST /api/Payment — provider: MOCK (TestMode)', 'info')
+      addLog(`POST /api/Payment — provider: ${form.provider}`, 'info')
+      if (form.provider === 'ORANGE') {
+        addLog('PIN Orange inclus dans metadata pour l’initiation serveur', 'info')
+      }
     },
     onSuccess: (data) => {
       const id = data.transactionId || data.id || `SIM-${Date.now()}`
       setTxId(id)
       addLog(`Transaction créée: ${id}`, 'ok')
       addLog('Statut initial: PENDING', 'warn')
+      if (form.escrowEnabled) {
+        addLog(`Escrow créé — mode: ${form.escrowMode}`, 'ok')
+      }
+      if (data.escrow?.pickupCode) {
+        addLog('Code de retrait généré (transmis à l\'acheteur)', 'ok')
+      }
       addLog(`Prompt USSD envoyé au ${form.phone} — Vérifiez le téléphone →`, 'ok')
+
+      setResult({
+        txId: id,
+        providerRef: data.providerReference,
+        status: 'PENDING',
+        amount: form.amount,
+        duration: Date.now() - startedAt,
+        escrow: data.escrow,
+      })
+
       setState('waiting_phone')
     },
     onError: (e: Error) => {
@@ -597,7 +878,7 @@ export default function PaymentSimulator() {
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full
                               bg-[var(--amber-bg)] text-[var(--amber)]
                               border border-[var(--amber-border)]">
-                MTN MoMo TEST
+                {form.provider} TEST
               </span>
             </div>
 
@@ -628,6 +909,47 @@ export default function PaymentSimulator() {
                 ))}
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block mb-1.5 text-[11px] font-semibold text-[var(--text-2)]">
+                    Provider
+                  </label>
+                  <select
+                    value={form.provider}
+                    disabled={!canInitiate}
+                    onChange={(e) => setForm((f) => ({ ...f, provider: e.target.value }))}
+                    className="w-full rounded-[6px] border border-[var(--border-med)] px-3 py-2
+                               text-[13px] bg-white text-[var(--text-1)] outline-none transition
+                               focus:border-[var(--orange)] focus:shadow-[0_0_0_3px_rgba(255,102,0,0.10)]
+                               disabled:bg-[var(--bg-subtle)] disabled:text-[var(--text-3)]"
+                  >
+                    {providerOptions.map((option) => (
+                      <option key={option.name} value={option.name}>{providerLabel(option.name)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {form.provider === 'ORANGE' && (
+                  <div>
+                    <label className="block mb-1.5 text-[11px] font-semibold text-[var(--text-2)]">
+                      PIN Orange
+                    </label>
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      value={form.orangePin}
+                      disabled={!canInitiate}
+                      onChange={(e) => setForm((f) => ({ ...f, orangePin: e.target.value }))}
+                      className="w-full rounded-[6px] border border-[var(--border-med)] px-3 py-2
+                                 text-[13px] bg-white text-[var(--text-1)] outline-none transition
+                                 focus:border-[var(--orange)] focus:shadow-[0_0_0_3px_rgba(255,102,0,0.10)]
+                                 disabled:bg-[var(--bg-subtle)] disabled:text-[var(--text-3)]"
+                      placeholder="1234"
+                    />
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block mb-1.5 text-[11px] font-semibold text-[var(--text-2)]">
                   Description
@@ -642,6 +964,58 @@ export default function PaymentSimulator() {
                              focus:border-[var(--orange)] focus:shadow-[0_0_0_3px_rgba(255,102,0,0.10)]
                              disabled:bg-[var(--bg-subtle)] disabled:text-[var(--text-3)]"
                 />
+              </div>
+
+              {/* Escrow toggle */}
+              <div className="p-3 rounded-[6px] border border-[var(--border)] bg-[var(--bg-subtle)] space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-semibold text-[var(--text-2)]">
+                    Activer l'escrow
+                  </label>
+                  <button
+                    type="button"
+                    disabled={!canInitiate}
+                    onClick={() => canInitiate && setForm((f) => ({ ...f, escrowEnabled: !f.escrowEnabled }))}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      form.escrowEnabled ? 'bg-[var(--orange)]' : 'bg-[var(--border-med)]'
+                    } ${!canInitiate ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                        form.escrowEnabled ? 'translate-x-5' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {form.escrowEnabled && (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {[
+                      { value: 'pickup_code', label: 'Code de retrait' },
+                      { value: 'auto_timeout', label: 'Timeout auto 7j' },
+                      { value: 'dual_confirm', label: 'Double confirmation' },
+                    ].map((mode) => (
+                      <label
+                        key={mode.value}
+                        className={`flex items-center gap-2 p-2 rounded-[6px] border text-[11px] ${
+                          form.escrowMode === mode.value
+                            ? 'border-[var(--orange-border)] bg-[var(--orange-bg)] text-[var(--orange-dark)]'
+                            : 'border-[var(--border)] bg-white text-[var(--text-2)]'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="escrowMode"
+                          value={mode.value}
+                          checked={form.escrowMode === mode.value}
+                          onChange={() => setForm((f) => ({ ...f, escrowMode: mode.value as PaymentForm['escrowMode'] }))}
+                          disabled={!canInitiate}
+                        />
+                        <span>{mode.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Scenario selector */}
@@ -686,8 +1060,8 @@ export default function PaymentSimulator() {
               <div className="p-3 bg-[var(--orange-bg)] rounded-[6px] border border-[var(--orange-border)]">
                 <p className="text-[11px] font-bold text-[var(--orange-dark)] mb-1">Mode simulateur actif</p>
                 <p className="text-[10px] text-[var(--text-2)]">
-                  Appel réel vers <code className="font-mono">POST /api/Payment</code> avec provider MOCK.
-                  Vous contrôlez manuellement la réponse USSD simulée sur le téléphone.
+                  Appel réel vers <code className="font-mono">POST /api/Payment</code> avec provider {form.provider}.
+                  Si le backend est en mock mode, le registre provider redirigera vers l’adapter simulé sans casser le contrat API.
                 </p>
               </div>
 
@@ -724,6 +1098,7 @@ export default function PaymentSimulator() {
         <div className="lg:sticky lg:top-4">
           <SimulatedPhone
             screen={phoneScreen}
+            provider={form.provider}
             txId={txId ?? undefined}
             amount={form.amount}
             ref_={form.ref}

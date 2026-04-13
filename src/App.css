@@ -341,6 +341,73 @@ main::before {
   }
 }
 
+/* Landing page motion */
+@keyframes landingRise {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes landingFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.landing-reveal {
+  opacity: 0;
+  transform: translateY(18px) scale(0.99);
+}
+
+.landing-reveal.landing-visible {
+  animation: landingRise 700ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.landing-delay-1 {
+  animation-delay: 80ms;
+}
+
+.landing-delay-2 {
+  animation-delay: 160ms;
+}
+
+.landing-delay-3 {
+  animation-delay: 240ms;
+}
+
+.landing-delay-4 {
+  animation-delay: 320ms;
+}
+
+.landing-float {
+  will-change: transform;
+}
+
+.landing-float.landing-visible {
+  animation: landingRise 700ms cubic-bezier(0.22, 1, 0.36, 1) forwards,
+    landingFloat 4200ms ease-in-out 900ms infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-reveal,
+  .landing-reveal.landing-visible,
+  .landing-float,
+  .landing-float.landing-visible {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .navbar .container {

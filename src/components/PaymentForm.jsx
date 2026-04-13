@@ -292,9 +292,9 @@ const PaymentForm = () => {
                   >
                     <span className="provider-icon">
                       {provider.value === 'MTN' && '📱'}
-                      {provider.value === 'Orange' && '🍊'}
-                      {provider.value === 'Express' && '💰'}
-                      {provider.value === 'Moov' && '🔵'}
+                      {provider.value === 'ORANGE' && '🍊'}
+                      {provider.value === 'WAVE' && '🌊'}
+                      {provider.value === 'MOOV' && '🔵'}
                     </span>
                     <span className="provider-name">{provider.label}</span>
                     <span className="provider-check">

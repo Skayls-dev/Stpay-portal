@@ -1,5 +1,5 @@
 // src/components/layout/Topbar.tsx
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { IconSearch, IconPlus } from '../icons/NavIcons'
 
@@ -10,6 +10,8 @@ const LABELS: Record<string, string> = {
   webhooks:       'Webhooks',
   analytics:      'Analytics',
   escrow:         'Escrow',
+  settlements:    'Settlements',
+  traceability:   'Traceability',
   providers:      'Santé API',
   profile:        'Mon profil',
 }
@@ -23,6 +25,7 @@ function usePageTitle() {
 
 export default function Topbar() {
   const { isSuperAdmin } = useAuth()
+  const navigate = useNavigate()
   const title = usePageTitle()
 
   return (
@@ -32,15 +35,21 @@ export default function Topbar() {
         {title}
       </h1>
 
+      {isSuperAdmin && (
+        <span className="hidden md:inline-flex items-center rounded-full border border-[var(--orange-border)] bg-[var(--orange-bg)] px-2.5 py-1 text-[10px] font-semibold text-[var(--orange)]">
+          Console Super Admin
+        </span>
+      )}
+
       <div className="flex items-center gap-2">
         <button className="btn-secondary">
           <IconSearch />
           Rechercher
         </button>
         {isSuperAdmin && (
-          <button className="btn-primary">
+          <button className="btn-primary" onClick={() => navigate('/demo/webshop')}>
             <IconPlus />
-            Nouveau paiement
+            Simulation
           </button>
         )}
       </div>

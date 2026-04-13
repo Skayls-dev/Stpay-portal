@@ -2,25 +2,32 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { transactionsApi } from '../lib/api/modules'
+import { escrowApi } from '../lib/api/modules'
 import { Badge, Button } from '../components/ui'
-import type { Transaction } from '../lib/api/modules'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface EscrowItem {
   id: string
+  transactionId: string
+  merchantId: string
   ref: string
   amount: number
   currency: string
   status: 'held' | 'in_transit' | 'delivered' | 'released' | 'disputed'
+  releaseMode: 'PickupCode' | 'AutoTimeout' | 'DualConfirm'
   provider: string
   merchantName?: string
   pickupCode?: string
+  autoReleaseAt?: string
+  merchantShippedAt?: string
+  buyerConfirmedAt?: string
+  releasedAt?: string
+  disputeReason?: string
   createdAt?: string
-  deliveredAt?: string
-  routeLabel?: string  // ex. "BRU → KIN"
+  routeLabel?: string
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -34,25 +41,27 @@ function fmtDate(iso?: string | null) {
   return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-// Map transactions to escrow items (mock enrichment — replace with real escrow API when available)
-function toEscrowItems(txs: Transaction[]): EscrowItem[] {
-  const escrowStatuses = ['pending', 'processing', 'completed']
-  return txs
-    .filter((tx) => escrowStatuses.includes(tx.status.toLowerCase()))
-    .map((tx, i) => ({
-      id: tx.id,
-      ref: `ESC-${tx.transactionId?.slice(-8).toUpperCase() ?? tx.id.slice(-8).toUpperCase()}`,
-      amount: tx.amount,
-      currency: tx.currency,
-      status: tx.status.toLowerCase() === 'completed' ? 'delivered'
-             : tx.status.toLowerCase() === 'processing' ? 'in_transit'
-             : 'held',
-      provider: tx.provider,
-      merchantName: tx.merchantName,
-      pickupCode: tx.status.toLowerCase() !== 'completed' ? '••••••' : undefined,
-      createdAt: tx.createdAt,
-      routeLabel: ['BRU → KIN', 'CDK → ABJ', 'PAR → DAK', 'AMS → LOS'][i % 4],
-    }))
+function normalizeStatus(status: string): EscrowItem['status'] {
+  const s = (status || '').toLowerCase()
+  if (s === 'in_transit' || s === 'intransit') return 'in_transit'
+  if (s === 'delivered') return 'delivered'
+  if (s === 'released') return 'released'
+  if (s === 'disputed') return 'disputed'
+  return 'held'
+}
+
+function normalizeReleaseMode(mode: string): EscrowItem['releaseMode'] {
+  if (mode === 'AutoTimeout') return 'AutoTimeout'
+  if (mode === 'DualConfirm') return 'DualConfirm'
+  return 'PickupCode'
+}
+
+function daysUntil(iso?: string) {
+  if (!iso) return 0
+  const target = new Date(iso).getTime()
+  const now = Date.now()
+  const ms = Math.max(0, target - now)
+  return Math.ceil(ms / (1000 * 60 * 60 * 24))
 }
 
 const STATUS_CONFIG = {
@@ -133,16 +142,76 @@ function EscrowProgress({ status }: { status: EscrowItem['status'] }) {
 
 // ─── Escrow card ──────────────────────────────────────────────────────────────
 
-function EscrowCard({ item, isSuperAdmin }: { item: EscrowItem; isSuperAdmin: boolean }) {
-  const [revealed, setRevealed] = useState(false)
-  const [releasing, setReleasing] = useState(false)
+function EscrowCard({ item, role, isSuperAdmin }: { item: EscrowItem; role: 'merchant' | 'super_admin'; isSuperAdmin: boolean }) {
+  const queryClient = useQueryClient()
+  const [disputeOpen, setDisputeOpen] = useState(false)
+  const [disputeReason, setDisputeReason] = useState('')
+  const [pickupOpen, setPickupOpen] = useState(false)
+  const [pickupCodeInput, setPickupCodeInput] = useState('')
   const cfg = STATUS_CONFIG[item.status]
 
-  const handleRelease = async () => {
-    setReleasing(true)
-    await new Promise((r) => setTimeout(r, 800))
-    toast.success(`Fonds libérés pour ${item.ref}`)
-    setReleasing(false)
+  const shipMutation = useMutation({
+    mutationFn: () => escrowApi.ship(item.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['escrow'] })
+      toast.success('Expédition confirmée')
+    },
+    onError: () => toast.error('Erreur lors de la confirmation'),
+  })
+
+  const releaseMutation = useMutation({
+    mutationFn: () => escrowApi.release(item.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['escrow'] })
+      toast.success(`Fonds libérés pour ${item.ref}`)
+    },
+    onError: () => toast.error('Impossible de libérer les fonds'),
+  })
+
+  const disputeMutation = useMutation({
+    mutationFn: (reason: string) => escrowApi.openDispute(item.id, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['escrow'] })
+      toast('Litige ouvert')
+      setDisputeOpen(false)
+      setDisputeReason('')
+    },
+    onError: () => toast.error('Erreur ouverture litige'),
+  })
+
+  const buyerConfirmMutation = useMutation({
+    mutationFn: () => escrowApi.buyerConfirm(item.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['escrow'] })
+      toast.success('Livraison confirmée')
+    },
+    onError: () => toast.error('Erreur lors de la confirmation de livraison'),
+  })
+
+  const pickupMutation = useMutation({
+    mutationFn: (code: string) => escrowApi.confirmPickup(item.id, code),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['escrow'] })
+      toast.success('Livraison confirmée !')
+      setPickupOpen(false)
+      setPickupCodeInput('')
+    },
+    onError: () => toast.error('Code invalide — vérifiez et réessayez'),
+  })
+
+  const releaseModeBadge = item.releaseMode === 'PickupCode'
+    ? { label: 'Code retrait', className: 'bg-blue-500/15 text-blue-300 border-blue-500/30' }
+    : item.releaseMode === 'AutoTimeout'
+      ? { label: 'Auto 7j', className: 'bg-slate-500/15 text-slate-300 border-slate-500/30' }
+      : { label: 'Double conf.', className: 'bg-purple-500/15 text-purple-300 border-purple-500/30' }
+
+  const submitPickup = () => {
+    const clean = pickupCodeInput.replace(/\D/g, '').slice(0, 6)
+    if (clean.length !== 6) {
+      toast.error('Entrez un code à 6 chiffres')
+      return
+    }
+    pickupMutation.mutate(clean)
   }
 
   return (
@@ -169,7 +238,12 @@ function EscrowCard({ item, isSuperAdmin }: { item: EscrowItem; isSuperAdmin: bo
             {item.merchantName || 'Marchand inconnu'} · {fmtDate(item.createdAt)}
           </p>
         </div>
-        <Badge color={cfg.color} dot>{cfg.label}</Badge>
+        <div className="flex items-center gap-2">
+          <Badge color={cfg.color} dot>{cfg.label}</Badge>
+          <span className={`inline-flex items-center px-[7px] py-[2px] rounded-full text-[10px] font-semibold border ${releaseModeBadge.className}`}>
+            {releaseModeBadge.label}
+          </span>
+        </div>
       </div>
 
       {/* Amount + provider */}
@@ -189,6 +263,12 @@ function EscrowCard({ item, isSuperAdmin }: { item: EscrowItem; isSuperAdmin: bo
       {/* Progress */}
       <EscrowProgress status={item.status} />
 
+      {item.releaseMode === 'AutoTimeout' && item.status !== 'released' && item.autoReleaseAt && (
+        <div className="text-[11px] text-[var(--text-muted)]">
+          <span>Libération auto dans {daysUntil(item.autoReleaseAt)}j</span>
+        </div>
+      )}
+
       {/* Pickup code */}
       {item.pickupCode && (
         <div className="flex items-center justify-between
@@ -196,33 +276,117 @@ function EscrowCard({ item, isSuperAdmin }: { item: EscrowItem; isSuperAdmin: bo
           <span className="text-[11px] text-[var(--text-muted)]">Code de retrait</span>
           <PickupCode
             code={item.pickupCode}
-            revealed={revealed}
-            onReveal={() => setRevealed((v) => !v)}
+            revealed={false}
+            onReveal={() => null}
           />
+        </div>
+      )}
+
+      {item.releaseMode === 'PickupCode' && item.status === 'in_transit' && (
+        <div className="pt-3 border-t border-[var(--border-soft)] space-y-2">
+          {!pickupOpen ? (
+            <Button
+              variant="secondary"
+              className="text-[12px]"
+              onClick={() => setPickupOpen(true)}
+            >
+              Saisir le code de retrait
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <input
+                value={pickupCodeInput}
+                onChange={(e) => setPickupCodeInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="6 chiffres"
+                className="flex-1 rounded-[var(--radius-sm)] border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-2.5 py-1.5 text-[12px]"
+              />
+              <Button
+                variant="primary"
+                className="text-[12px]"
+                onClick={submitPickup}
+                disabled={pickupMutation.isPending}
+              >
+                {pickupMutation.isPending ? '...' : 'Confirmer'}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Merchant actions */}
+      {role === 'merchant' && (
+        <div className="flex gap-2 pt-3 border-t border-[var(--border-soft)]">
+          {item.status === 'held' && (
+            <Button
+              variant="secondary"
+              className="flex-1 justify-center text-[12px]"
+              onClick={() => shipMutation.mutate()}
+              disabled={shipMutation.isPending}
+            >
+              {shipMutation.isPending ? '...' : 'Confirmer expédition'}
+            </Button>
+          )}
+          {item.status === 'in_transit' && item.releaseMode === 'DualConfirm' && (
+            <Button
+              variant="primary"
+              className="flex-1 justify-center text-[12px]"
+              onClick={() => buyerConfirmMutation.mutate()}
+              disabled={buyerConfirmMutation.isPending}
+            >
+              {buyerConfirmMutation.isPending ? '...' : 'Confirmer livraison'}
+            </Button>
+          )}
         </div>
       )}
 
       {/* Admin actions */}
       {isSuperAdmin && item.status !== 'released' && (
-        <div className="flex gap-2 pt-3 border-t border-[var(--border-soft)]">
-          {item.status === 'delivered' && (
-            <Button
-              variant="primary"
-              className="flex-1 justify-center text-[12px]"
-              onClick={handleRelease}
-              disabled={releasing}
-            >
-              {releasing ? 'Libération…' : '→ Libérer les fonds'}
-            </Button>
-          )}
-          {item.status !== 'disputed' && (
-            <Button
-              variant="danger"
-              className="text-[12px]"
-              onClick={() => toast('Ouverture d\'un litige bientôt disponible')}
-            >
-              Litige
-            </Button>
+        <div className="flex flex-col gap-2 pt-3 border-t border-[var(--border-soft)]">
+          <div className="flex gap-2">
+            {item.status === 'delivered' && (
+              <Button
+                variant="primary"
+                className="flex-1 justify-center text-[12px]"
+                onClick={() => releaseMutation.mutate()}
+                disabled={releaseMutation.isPending}
+              >
+                {releaseMutation.isPending ? 'Libération…' : 'Libérer les fonds'}
+              </Button>
+            )}
+            {item.status !== 'disputed' && (
+              <Button
+                variant="danger"
+                className="text-[12px]"
+                onClick={() => setDisputeOpen((v) => !v)}
+              >
+                Litige
+              </Button>
+            )}
+          </div>
+
+          {disputeOpen && (
+            <div className="flex gap-2">
+              <input
+                value={disputeReason}
+                onChange={(e) => setDisputeReason(e.target.value)}
+                placeholder="Raison du litige"
+                className="flex-1 rounded-[var(--radius-sm)] border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-2.5 py-1.5 text-[12px]"
+              />
+              <Button
+                variant="danger"
+                className="text-[12px]"
+                onClick={() => {
+                  if (!disputeReason.trim()) {
+                    toast.error('Saisissez une raison')
+                    return
+                  }
+                  disputeMutation.mutate(disputeReason.trim())
+                }}
+                disabled={disputeMutation.isPending}
+              >
+                {disputeMutation.isPending ? '...' : 'Envoyer'}
+              </Button>
+            </div>
           )}
         </div>
       )}
@@ -233,18 +397,49 @@ function EscrowCard({ item, isSuperAdmin }: { item: EscrowItem; isSuperAdmin: bo
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Escrow() {
+  const navigate = useNavigate()
   const { isSuperAdmin, user, role } = useAuth()
   const [filter, setFilter] = useState<'all' | EscrowItem['status']>('all')
+  const merchantApiKey = typeof window !== 'undefined' ? localStorage.getItem('stpay_api_key') : null
+  const missingApiKey = role === 'merchant' && !merchantApiKey
 
-  const { data: txs = [], isLoading } = useQuery({
-    queryKey: ['escrow-transactions', role, user.merchantId],
-    queryFn: () => transactionsApi.list({
-      merchantId: role === 'merchant' ? user.merchantId : undefined,
-    }),
+  const { data = [], isLoading, error } = useQuery({
+    queryKey: ['escrow', role, user.merchantId, filter],
+    queryFn: () => escrowApi.list(
+      role === 'merchant' ? user.merchantId : undefined,
+      filter !== 'all' ? filter : undefined,
+    ),
+    enabled: !missingApiKey,
     refetchInterval: 30_000,
   })
 
-  const items = toEscrowItems(txs)
+  const items: EscrowItem[] = (Array.isArray(data) ? data : []).map((raw) => {
+    const item = raw as Partial<EscrowItem> & Record<string, unknown>
+    const id = String(item.id || '')
+    const status = normalizeStatus(String(item.status || 'held'))
+
+    return {
+      id,
+      transactionId: String(item.transactionId || ''),
+      merchantId: String(item.merchantId || ''),
+      ref: `ESC-${id.slice(-8).toUpperCase()}`,
+      amount: Number(item.amount || 0),
+      currency: String(item.currency || 'XAF'),
+      status,
+      releaseMode: normalizeReleaseMode(String(item.releaseMode || 'PickupCode')),
+      provider: String(item.provider || 'N/A'),
+      merchantName: typeof item.merchantName === 'string' ? item.merchantName : undefined,
+      pickupCode: typeof item.pickupCode === 'string' ? item.pickupCode : undefined,
+      autoReleaseAt: typeof item.autoReleaseAt === 'string' ? item.autoReleaseAt : undefined,
+      merchantShippedAt: typeof item.merchantShippedAt === 'string' ? item.merchantShippedAt : undefined,
+      buyerConfirmedAt: typeof item.buyerConfirmedAt === 'string' ? item.buyerConfirmedAt : undefined,
+      releasedAt: typeof item.releasedAt === 'string' ? item.releasedAt : undefined,
+      disputeReason: typeof item.disputeReason === 'string' ? item.disputeReason : undefined,
+      createdAt: typeof item.createdAt === 'string' ? item.createdAt : undefined,
+      routeLabel: typeof item.routeLabel === 'string' ? item.routeLabel : undefined,
+    }
+  })
+
   const filtered = filter === 'all' ? items : items.filter((i) => i.status === filter)
 
   const heldAmt    = items.filter((i) => i.status === 'held').reduce((s, i) => s + i.amount, 0)
@@ -261,6 +456,32 @@ export default function Escrow() {
 
   return (
     <div className="space-y-4">
+      {missingApiKey && (
+        <div className="rounded-[var(--radius-md)] border border-[var(--amber-border)] bg-[var(--amber-bg)] p-4">
+          <p className="text-[13px] font-semibold text-[var(--amber)]">Clé API manquante</p>
+          <p className="mt-1 text-[12px] text-[var(--text-secondary)]">
+            La section Escrow nécessite une clé API marchande active (X-Api-Key).
+          </p>
+          <div className="mt-3">
+            <Button
+              variant="secondary"
+              className="text-[12px]"
+              onClick={() => navigate('/merchant/developer')}
+            >
+              Ouvrir Developer Portal
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!missingApiKey && error && (
+        <div className="rounded-[var(--radius-md)] border border-[var(--red-border)] bg-[var(--red-bg)] p-4">
+          <p className="text-[13px] font-semibold text-[var(--red)]">Impossible de charger les escrows</p>
+          <p className="mt-1 text-[12px] text-[var(--text-secondary)]">
+            {error instanceof Error ? error.message : 'Erreur inconnue'}
+          </p>
+        </div>
+      )}
 
       {/* ── KPI row ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -347,7 +568,7 @@ export default function Escrow() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.map((item) => (
-            <EscrowCard key={item.id} item={item} isSuperAdmin={isSuperAdmin} />
+            <EscrowCard key={item.id} item={item} role={role} isSuperAdmin={isSuperAdmin} />
           ))}
         </div>
       )}

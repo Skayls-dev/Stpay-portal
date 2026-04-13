@@ -39,6 +39,21 @@ Developer quick reference card
 
 ## 🎓 Comprehensive Guides
 
+### **guides/GUIDES_INDEX.md** (new)
+Collection complete des guides integration:
+- Premier paiement en 10 minutes
+- Webhooks de production
+- Gestion des erreurs et reprise
+- Securite API marchands
+- Mobile money multi-operateurs
+- Go-live checklist
+- Observabilite et analytics
+- Tests automatises integration
+- Migration API
+- Playbook support L1
+
+**👉 [Read guides/GUIDES_INDEX.md](./guides/GUIDES_INDEX.md)**
+
 ### **MOCK_PROVIDER_GUIDE.md** (550+ lines)
 Most comprehensive guide - everything about mock provider
 - Overview and quick start (3 options)

@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { authApi } from '../lib/api/auth'
+import client from '../lib/api/client'
 import { useAuthStore } from '../stores/authStore'
 
 interface LoginForm { email: string; password: string }
@@ -29,7 +30,35 @@ export default function Login({ portal = 'merchant' }: LoginProps) {
     setLoading(true)
     try {
       const res = await authApi.login(data, { portal })
+
+      const isRoleMismatch =
+        (portal === 'merchant' && res.user.role !== 'merchant') ||
+        (portal === 'admin' && res.user.role !== 'super_admin')
+
+      if (isRoleMismatch) {
+        toast.error(
+          portal === 'merchant'
+            ? 'Ce compte est admin. Utilisez le portail admin.'
+            : 'Ce compte est marchand. Utilisez le portail marchand.',
+        )
+        return
+      }
+
       login(res.user, res.token, res.apiKey)
+
+      if (res.user.role === 'merchant' && !res.apiKey) {
+        try {
+          const keysResponse = await client.get('/api/keys')
+          const keys = Array.isArray(keysResponse.data?.keys) ? keysResponse.data.keys : []
+          const firstKey = keys[0]?.key
+          if (typeof firstKey === 'string' && firstKey.trim()) {
+            localStorage.setItem('stpay_api_key', firstKey)
+          }
+        } catch {
+          // Non-blocking: merchant can still navigate, and key can be configured later.
+        }
+      }
+
       const home = res.user.role === 'super_admin' ? '/admin' : '/merchant'
       const isLogin = ['/login','/admin/login','/merchant/login'].includes(from)
       navigate(!from || from === '/' || isLogin ? home : from, { replace: true })

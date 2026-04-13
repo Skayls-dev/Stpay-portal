@@ -43,12 +43,14 @@ client.interceptors.response.use(
   (response) => response,
   (error) => {
     const requestUrl = String(error?.config?.url || '')
+    const responseMessage = String(error?.response?.data?.message || error?.response?.data?.Error || '').toLowerCase()
+    const isApiKeyAuthFailure = responseMessage.includes('api key')
     const isPublicAuthCall =
       requestUrl.includes('/api/admin/login')
       || requestUrl.includes('/api/merchant/login')
       || requestUrl.includes('/api/merchant/register')
 
-    if (error?.response?.status === 401 && !isPublicAuthCall) {
+    if (error?.response?.status === 401 && !isPublicAuthCall && !isApiKeyAuthFailure) {
       AUTH_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key))
       window.location.href = '/choose-portal'
     }

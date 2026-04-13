@@ -19,6 +19,36 @@ src/api/
 └── hooks.ts          # Hooks React personnalisés
 ```
 
+## Structure cible SDK stable (Web + React Native)
+
+Le SDK est considere "stable" quand l'API publique ci-dessous reste compatible entre releases mineures:
+
+```text
+src/api/
+  index.ts            # exports publics stables
+  compat-client.ts    # couche fetch compatible web/rn
+  client.gen.ts       # client genere openapi
+  sdk.gen.ts          # fonctions generees
+  services.ts         # facade metier stable
+  hooks.ts            # hooks react (web/rn)
+  types.ts            # types publics normalises
+  keyManagement.ts    # utilitaires de gestion cle API
+  client/*            # generated internals
+  core/*              # generated internals
+```
+
+Regle: les applications integratrices ne doivent consommer que `src/api/index.ts` et les types exposes.
+
+## Workflow de publication SDK (recommande)
+
+1. Regenerer le SDK depuis OpenAPI.
+2. Verifier la compatibilite de l'API publique (`index.ts`, `types.ts`, `services.ts`).
+3. Valider les exemples Web et React Native.
+4. Mettre a jour la documentation et le changelog.
+5. Executer les tests et valider le time-to-first-payment.
+
+Checklist complete: [SDK_RELEASE_CHECKLIST.md](SDK_RELEASE_CHECKLIST.md)
+
 ## Utilisation Basique
 
 ### Import du SDK

@@ -1,5 +1,5 @@
 // src/pages/Analytics.tsx
-import React, { useState, useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   AreaChart, Area, BarChart, Bar,
@@ -7,8 +7,9 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts'
 import { useAuth } from '../hooks/useAuth'
-import { transactionsApi } from '../lib/api/modules'
+import { analyticsApi, transactionsApi } from '../lib/api/modules'
 import type { Transaction } from '../lib/api/modules'
+import { formatDxDuration, getDxAnalyticsSummary, subscribeDxAnalytics, type DxAnalyticsSummary } from '../lib/dxAnalytics'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -162,12 +163,32 @@ export default function Analytics() {
   const { role, user } = useAuth()
   const [periodIdx, setPeriodIdx] = useState(1)
   const days = PERIODS[periodIdx].days
+  const [dxSummary, setDxSummary] = useState<DxAnalyticsSummary>(() => getDxAnalyticsSummary({
+    days,
+    actor: role === 'merchant' ? { merchantId: user.merchantId, role } : undefined,
+  }))
+
+  useEffect(() => {
+    const refresh = () => setDxSummary(getDxAnalyticsSummary({
+      days,
+      actor: role === 'merchant' ? { merchantId: user.merchantId, role } : undefined,
+    }))
+    refresh()
+    return subscribeDxAnalytics(refresh)
+  }, [days, role, user.merchantId])
 
   const { data: txs = [], isLoading } = useQuery({
     queryKey: ['analytics-transactions', role, user.merchantId],
     queryFn: () => transactionsApi.list({
       merchantId: role === 'merchant' ? user.merchantId : undefined,
     }),
+  })
+
+  const { data: serverDxSummary } = useQuery({
+    queryKey: ['analytics-dx-summary', days, role, user.merchantId],
+    queryFn: () => analyticsApi.dxSummary(days),
+    retry: false,
+    staleTime: 15_000,
   })
 
   const daily    = useMemo(() => buildDailyData(txs, days), [txs, days])
@@ -182,6 +203,7 @@ export default function Analytics() {
   const avgTx    = totalTx > 0 ? Math.round(totalVol / totalTx) : 0
 
   const PIE_TOTAL = byProv.reduce((s, p) => s + p.volume, 0)
+  const displayedDxSummary = serverDxSummary ?? dxSummary
 
   return (
     <div className="space-y-4">
@@ -213,6 +235,84 @@ export default function Analytics() {
         <Kpi label="Transactions"     value={totalTx.toLocaleString('fr-FR')} sub="sur la période" />
         <Kpi label="Taux de succès"   value={`${succRate} %`}        sub="transactions réussies"  color="text-[var(--green)]" />
         <Kpi label="Panier moyen"     value={fmtM(avgTx)}           sub="XAF par transaction" />
+      </div>
+
+      <div className="panel">
+        <div className="panel-header">
+          <span className="panel-title">DX onboarding</span>
+          <span className="text-[11px] text-[var(--text-muted)]">Métriques locales du Developer Portal</span>
+        </div>
+        <div className="p-4 space-y-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Kpi label="Sessions DX" value={displayedDxSummary.totalSessions.toLocaleString('fr-FR')} sub="sessions observées" />
+            <Kpi label="Conversion" value={`${displayedDxSummary.conversionRate} %`} sub="vers 1er paiement réussi" color="text-[var(--green)]" />
+            <Kpi label="1er appel API" value={formatDxDuration(displayedDxSummary.avgTimeToFirstApiCallMs)} sub="temps moyen" color="text-[var(--amber)]" />
+            <Kpi label="1er succès paiement" value={formatDxDuration(displayedDxSummary.avgTimeToFirstSuccessPaymentMs)} sub="temps moyen" color="text-[var(--gold-bright)]" />
+          </div>
+
+          <div className="grid lg:grid-cols-[220px_1fr] gap-4 items-start">
+            <div className="bg-[var(--bg-raised)] border border-[var(--border-soft)] rounded-[var(--radius-md)] p-4 space-y-2">
+              <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Sessions actives</p>
+              <p className="font-display font-bold text-[24px] leading-none tracking-tight text-[var(--text-primary)]">{displayedDxSummary.activeSessions}</p>
+              <p className="text-[11px] text-[var(--text-muted)]">Sessions sans paiement final réussi</p>
+            </div>
+
+            <div className="bg-[var(--bg-raised)] border border-[var(--border-soft)] rounded-[var(--radius-md)] p-4">
+              <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)] mb-3">Drop-off par étape</p>
+              <div className="space-y-2.5">
+                {displayedDxSummary.dropOffByStep.length === 0 && (
+                  <p className="text-[12px] text-[var(--text-muted)]">Aucun drop-off enregistré pour le moment.</p>
+                )}
+                {displayedDxSummary.dropOffByStep.map((entry) => {
+                  const width = displayedDxSummary.activeSessions > 0 ? Math.max(10, Math.round((entry.count / displayedDxSummary.activeSessions) * 100)) : 0
+                  return (
+                    <div key={entry.step} className="flex items-center gap-3">
+                      <span className="w-44 text-[12px] text-[var(--text-secondary)] truncate">{entry.label}</span>
+                      <div className="flex-1 h-2 bg-[var(--bg-subtle)] rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-[var(--orange)]" style={{ width: `${width}%` }} />
+                      </div>
+                      <span className="text-[11px] font-mono font-semibold text-[var(--text-primary)] w-8 text-right">{entry.count}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-3">
+            <ChartPanel title="Tendance DX par jour">
+              <ResponsiveContainer width="100%" height={180}>
+                <AreaChart data={displayedDxSummary.daily} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                  <CartesianGrid {...CHART_THEME.cartesianGrid} />
+                  <XAxis dataKey="label" {...CHART_THEME.axis} />
+                  <YAxis {...CHART_THEME.axis} width={36} allowDecimals={false} />
+                  <Tooltip contentStyle={CHART_THEME.tooltip.contentStyle} />
+                  <Area type="monotone" dataKey="sessions" stroke="#5A5E78" fill="#5A5E78" fillOpacity={0.12} strokeWidth={2} />
+                  <Area type="monotone" dataKey="apiCalls" stroke="#F59E0B" fill="#F59E0B" fillOpacity={0.16} strokeWidth={2} />
+                  <Area type="monotone" dataKey="successes" stroke="#22C55E" fill="#22C55E" fillOpacity={0.18} strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </ChartPanel>
+
+            <ChartPanel title="Funnel par compte">
+              <div className="space-y-2.5">
+                {displayedDxSummary.actorBreakdown.length === 0 && (
+                  <p className="text-[12px] text-[var(--text-muted)]">Aucune donnée par compte pour le moment.</p>
+                )}
+                {displayedDxSummary.actorBreakdown.map((entry) => (
+                  <div key={entry.actorKey} className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[12px] text-[var(--text-primary)] truncate">{entry.label}</p>
+                      <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide">{entry.role}{entry.merchantId ? ` • ${entry.merchantId}` : ''}</p>
+                    </div>
+                    <span className="text-[11px] text-[var(--text-secondary)]">{entry.sessions} sess.</span>
+                    <span className="text-[11px] font-mono font-semibold text-[var(--green)]">{entry.conversionRate}%</span>
+                  </div>
+                ))}
+              </div>
+            </ChartPanel>
+          </div>
+        </div>
       </div>
 
       {/* ── Volume area chart ── */}

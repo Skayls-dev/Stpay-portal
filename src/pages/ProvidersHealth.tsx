@@ -11,6 +11,13 @@ const PROVIDER_LABELS: Record<string, string> = {
   MOOV: 'Moov Money',
 }
 
+const PROVIDER_DESCRIPTIONS: Record<string, string> = {
+  MTN: "Cameroun, Côte d'Ivoire, Ghana",
+  ORANGE: 'Orange Money multi-pays',
+  WAVE: 'Wave wallet',
+  MOOV: 'Moov Money',
+}
+
 function HealthDot({ status }: { status: 'up' | 'down' | 'unknown' }) {
   return (
     <span
@@ -73,20 +80,24 @@ export default function ProvidersHealth() {
 
         {/* Per-provider cards */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {(['MTN', 'ORANGE', 'WAVE', 'MOOV'] as const).map((name) => {
-            const check = providers.find((p) => p.name === name)
-            const status = check?.status ?? 'unknown'
+          {providers.map((provider) => {
+            const name = provider.name.toUpperCase()
+            const status = provider.status ?? 'unknown'
             return (
               <Card key={name} className="flex flex-col gap-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-slate-900">{PROVIDER_LABELS[name]}</h3>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold text-slate-900">{PROVIDER_LABELS[name] || name}</h3>
+                    <p className="text-xs text-muted">{PROVIDER_DESCRIPTIONS[name] || 'Provider configuré côté backend'}</p>
+                  </div>
                   <HealthDot status={status as 'up' | 'down' | 'unknown'} />
                 </div>
-                <Badge
-                  color={status === 'up' ? 'emerald' : status === 'down' ? 'red' : 'slate'}
-                >
+                <Badge color={status === 'up' ? 'emerald' : status === 'down' ? 'red' : 'slate'}>
                   {status === 'up' ? 'Opérationnel' : status === 'down' ? 'Hors service' : 'Inconnu'}
                 </Badge>
+                {Array.isArray(provider.supportedFeatures) && provider.supportedFeatures.length > 0 && (
+                  <p className="text-xs text-muted">Features: {provider.supportedFeatures.join(', ')}</p>
+                )}
               </Card>
             )
           })}

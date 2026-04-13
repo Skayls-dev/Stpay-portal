@@ -16,6 +16,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'merchants.create',
     'merchants.view_all',
     'merchants.rotate_all',
+    // Settlements
+    'settlements.view_all',
+    'settlements.trigger',
     // Transactions
     'transactions.view_all',
     'transactions.refund_all',
@@ -34,6 +37,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     // Marchands — données propres uniquement
     'merchants.view_own',
     'merchants.view_own_keys',
+    // Settlements
+    'settlements.view_own',
     // Transactions
     'transactions.view_own',
     'transactions.refund_own',
