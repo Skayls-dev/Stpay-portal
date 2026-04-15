@@ -82,7 +82,7 @@ const Dashboard = () => {
         <h1>Welcome to ST Pay Gateway</h1>
         <p>
           Votre solution de paiement moderne et sécurisée. 
-          Traitez vos paiements avec MTN, Orange, Moov et Wave en toute simplicité.
+          Traitez vos paiements avec MTN et Orange en toute simplicité.
         </p>
       </div>
 

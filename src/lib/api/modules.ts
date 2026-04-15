@@ -1,5 +1,6 @@
 import client from './client'
 import type { UserRole } from '../../hooks/useAuth'
+import { postApiPaymentByPaymentIdPush } from '../../api/sdk.gen'
 
 export const POLL_INTERVAL_TRANSACTIONS = 15_000
 export const POLL_INTERVAL_PROVIDERS = 60_000
@@ -390,6 +391,25 @@ export const transactionsApi = {
     return parseTransactionStatusPayload(response.data)
   },
 
+  async pushPayment(transactionId: string): Promise<{ pushTriggered?: boolean; [key: string]: unknown }> {
+    if (!transactionId) {
+      throw new Error('transactionId is required')
+    }
+
+    const apiKey = typeof window !== 'undefined' ? localStorage.getItem('stpay_api_key') || '' : ''
+    const token = typeof window !== 'undefined' ? localStorage.getItem('stpay_token') || '' : ''
+
+    return await postApiPaymentByPaymentIdPush({
+      path: { paymentId: transactionId },
+      headers: {
+        ...(apiKey ? { 'X-Api-Key': apiKey } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      responseStyle: 'data',
+      throwOnError: true,
+    }) as { pushTriggered?: boolean; [key: string]: unknown }
+  },
+
   getStatusText(status: string): string {
     return statusTextMap[status.toLowerCase()] || status
   },
@@ -535,8 +555,6 @@ export const providersHealthApi = {
       return [
         { name: 'MTN', supportedFeatures: [] },
         { name: 'ORANGE', supportedFeatures: [] },
-        { name: 'WAVE', supportedFeatures: [] },
-        { name: 'MOOV', supportedFeatures: [] },
       ]
     }
   },

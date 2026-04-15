@@ -17,14 +17,14 @@ function fmtDate(iso?: string | null) {
 
 // ─── Provider badge ───────────────────────────────────────────────────────────
 const PROV_CLS: Record<string, string> = {
-  MTN: 'prov-mtn', ORANGE: 'prov-ora', WAVE: 'prov-wav', MOOV: 'prov-moov',
+  MTN: 'prov-mtn', ORANGE: 'prov-ora',
 }
 
 function ProviderBadge({ name }: { name: string }) {
   return (
     <span className={`inline-flex items-center justify-center w-[24px] h-[24px]
                       rounded-[5px] text-[8px] font-extrabold font-mono flex-shrink-0
-                      ${PROV_CLS[name?.toUpperCase()] ?? 'prov-moov'}`}>
+                      ${PROV_CLS[name?.toUpperCase()] ?? 'prov-ora'}`}>
       {name?.slice(0, 3).toUpperCase() ?? '???'}
     </span>
   )
@@ -91,7 +91,6 @@ function Sparkline() {
 const PROVIDERS = [
   { name: 'MTN MoMo',     short: 'MTN', pct: 63, vol: 89_200_000, bar: '#FFC700' },
   { name: 'Orange Money', short: 'ORA', pct: 25, vol: 35_800_000, bar: '#FF6600' },
-  { name: 'Wave',         short: 'WAV', pct: 12, vol: 17_800_000, bar: '#3B82F6' },
 ]
 
 function ProvidersPanel() {

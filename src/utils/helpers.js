@@ -232,9 +232,7 @@ export const storage = {
 export const constants = {
   PROVIDERS: [
     { value: 'MTN', label: '📱 MTN Mobile Money', color: '#FFD700' },
-    { value: 'ORANGE', label: '🍊 Orange Money', color: '#FF6600' },
-    { value: 'WAVE', label: '🌊 Wave', color: '#0066CC' },
-    { value: 'MOOV', label: '🔵 Moov Money', color: '#00AA44' }
+    { value: 'ORANGE', label: '🍊 Orange Money', color: '#FF6600' }
   ],
   
   CURRENCIES: [

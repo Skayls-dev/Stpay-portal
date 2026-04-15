@@ -158,8 +158,8 @@ export class PaymentValidationService {
       errors.push('La devise doit être un code à 3 caractères');
     }
 
-    if (!request.provider || !['MTN', 'ORANGE', 'MOOV', 'WAVE'].includes(request.provider.toUpperCase())) {
-      errors.push('Le fournisseur doit être MTN, ORANGE, MOOV ou WAVE');
+    if (!request.provider || !['MTN', 'ORANGE'].includes(request.provider.toUpperCase())) {
+      errors.push('Le fournisseur doit être MTN ou ORANGE');
     }
 
     if (!request.customer?.phoneNumber?.trim()) {

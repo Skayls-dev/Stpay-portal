@@ -2,7 +2,8 @@
   "input": "./stpay-api.json",
   "output": {
     "path": "src/api",
-    "format": "prettier"
+    "format": "prettier",
+    "clean": false
   },
   "client": {
     "name": "@hey-api/client-fetch"

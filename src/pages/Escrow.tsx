@@ -253,9 +253,7 @@ function EscrowCard({ item, role, isSuperAdmin }: { item: EscrowItem; role: 'mer
         </p>
         <span className={`inline-flex items-center justify-center w-[28px] h-[28px]
                           rounded-[6px] text-[9px] font-bold font-mono
-                          ${item.provider?.toUpperCase() === 'MTN'    ? 'prov-mtn'  :
-                            item.provider?.toUpperCase() === 'ORANGE' ? 'prov-ora'  :
-                            item.provider?.toUpperCase() === 'WAVE'   ? 'prov-wav'  : 'prov-moov'}`}>
+                          ${item.provider?.toUpperCase() === 'MTN' ? 'prov-mtn' : 'prov-ora'}`}>
           {item.provider?.slice(0, 3).toUpperCase() ?? '???'}
         </span>
       </div>

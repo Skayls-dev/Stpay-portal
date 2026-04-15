@@ -7,15 +7,11 @@ import RequirePermission from '../components/auth/RequirePermission'
 const PROVIDER_LABELS: Record<string, string> = {
   MTN: 'MTN Mobile Money',
   ORANGE: 'Orange Money',
-  WAVE: 'Wave',
-  MOOV: 'Moov Money',
 }
 
 const PROVIDER_DESCRIPTIONS: Record<string, string> = {
   MTN: "Cameroun, Côte d'Ivoire, Ghana",
   ORANGE: 'Orange Money multi-pays',
-  WAVE: 'Wave wallet',
-  MOOV: 'Moov Money',
 }
 
 function HealthDot({ status }: { status: 'up' | 'down' | 'unknown' }) {

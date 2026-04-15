@@ -1,25 +1,26 @@
 // src/pages/Transactions.tsx
 import React, { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import { useAuth } from '../hooks/useAuth'
 import { transactionsApi, POLL_INTERVAL_TRANSACTIONS } from '../lib/api/modules'
 import { Badge, Input, Select, Button } from '../components/ui'
 import { IconClose, IconCopy } from '../components/icons/NavIcons'
 import type { Transaction } from '../lib/api/modules'
 
-const PROVIDERS = ['all','MTN','ORANGE','WAVE','MOOV']
+const PROVIDERS = ['all','MTN','ORANGE']
 const STATUSES  = ['all','pending','processing','completed','failed','cancelled']
 
 const PROV_CLS: Record<string, string> = {
-  MTN:'prov-mtn', ORANGE:'prov-ora', WAVE:'prov-wav', MOOV:'prov-moov',
+  MTN:'prov-mtn', ORANGE:'prov-ora',
 }
 
 function ProvBadge({ name }: { name: string }) {
   return (
     <span className={`inline-flex items-center justify-center w-[24px] h-[24px]
                       rounded-[5px] text-[8px] font-extrabold font-mono flex-shrink-0
-                      ${PROV_CLS[name?.toUpperCase()] ?? 'prov-moov'}`}>
+                      ${PROV_CLS[name?.toUpperCase()] ?? 'prov-ora'}`}>
       {name?.slice(0,3).toUpperCase()}
     </span>
   )
@@ -85,7 +86,25 @@ function fmtShort(iso?: string | null) {
   return new Date(iso).toLocaleDateString('fr-FR', { day:'2-digit', month:'short' })
 }
 
-function DetailPanel({ tx, onClose }: { tx: Transaction|null; onClose: () => void }) {
+function canTriggerOrangePush(tx: Transaction | null): boolean {
+  if (!tx) return false
+  if ((tx.provider || '').toUpperCase() !== 'ORANGE') return false
+
+  const status = (tx.status || '').toUpperCase()
+  return status === 'PENDING' || status === 'PROCESSING' || status === 'INITIATED'
+}
+
+function DetailPanel({
+  tx,
+  onClose,
+  onPushPayment,
+  isPushing,
+}: {
+  tx: Transaction|null
+  onClose: () => void
+  onPushPayment: (tx: Transaction) => void
+  isPushing: boolean
+}) {
   const navigate = useNavigate()
   const [visible, setVisible] = useState(false)
   useEffect(() => {
@@ -164,6 +183,16 @@ function DetailPanel({ tx, onClose }: { tx: Transaction|null; onClose: () => voi
         </div>
 
         <div className="px-5 py-4 border-t border-[var(--border-soft)] flex gap-2 flex-shrink-0">
+          {canTriggerOrangePush(tx) && (
+            <Button
+              variant="primary"
+              className="flex-1 justify-center text-[12px]"
+              onClick={() => tx && onPushPayment(tx)}
+              disabled={isPushing}
+            >
+              {isPushing ? 'Relance en cours…' : 'Relancer la demande mobile'}
+            </Button>
+          )}
           <Button variant="secondary" className="flex-1 justify-center text-[12px]"
                   onClick={() => tx && navigator.clipboard.writeText(tx.transactionId||tx.id)}>
             <IconCopy/> Copier l'ID
@@ -198,6 +227,27 @@ export default function Transactions() {
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Transaction|null>(null)
   const isFiltered = statusFilter!=='all'||providerFilter!=='all'||!!merchantFilter||!!search
+
+  const pushMutation = useMutation({
+    mutationFn: (transactionId: string) => transactionsApi.pushPayment(transactionId),
+    onSuccess: () => {
+      toast.success('Demande mobile relancee avec succes')
+    },
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Echec de la relance mobile'
+      toast.error(message)
+    },
+  })
+
+  const handlePushPayment = (tx: Transaction) => {
+    const paymentId = tx.transactionId || tx.id
+    if (!paymentId) {
+      toast.error('Transaction invalide')
+      return
+    }
+
+    pushMutation.mutate(paymentId)
+  }
 
   const { data: txs=[], isFetching, isLoading } = useQuery({
     queryKey: ['transactions', statusFilter, providerFilter, merchantFilter],
@@ -368,7 +418,12 @@ export default function Transactions() {
         )}
       </div>
 
-      <DetailPanel tx={selected} onClose={() => setSelected(null)}/>
+      <DetailPanel
+        tx={selected}
+        onClose={() => setSelected(null)}
+        onPushPayment={handlePushPayment}
+        isPushing={pushMutation.isPending}
+      />
     </div>
   )
 }

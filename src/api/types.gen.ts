@@ -32,7 +32,7 @@ export type EscrowOptions = {
 export type PaymentRequest = {
     amount: number;
     currency: string;
-    provider: 'MTN' | 'ORANGE' | 'MOOV' | 'WAVE' | 'AIRTEL';
+    provider: 'MTN' | 'ORANGE';
     customer: CustomerInfo;
     merchant: MerchantInfo;
     description?: string | null;
@@ -41,7 +41,6 @@ export type PaymentRequest = {
     } | null;
     merchantApiKey?: string | null;
     escrow?: EscrowOptions;
-    countryCode?: string;
 };
 
 export type EscrowInfo = {
@@ -204,6 +203,54 @@ export type WebhookReplayResponse = {
 export type PendingWebhookRetriesResponse = {
     count: number;
     items: Array<WebhookSummary>;
+};
+
+export type InitiateExternalSettlementRequest = {
+    action: 'refund_buyer' | 'release_merchant';
+    provider: string;
+    destinationRef: string;
+};
+
+export type ExternalSettlementCallbackApiRequest = {
+    externalReference: string;
+    status: 'success' | 'failed';
+    providerPayload?: string | null;
+    failureReason?: string | null;
+};
+
+export type ProviderTransferResponse = {
+    id?: string;
+    escrowId?: string;
+    merchantId?: string;
+    currency?: string;
+    amount?: number;
+    action?: string;
+    provider?: string;
+    destinationRef?: string;
+    externalReference?: string;
+    status?: string;
+    failureReason?: string | null;
+    requestedAt?: string;
+    completedAt?: string | null;
+    updatedAt?: string;
+};
+
+export type ReconcileExternalSettlementsRequest = {
+    provider: string;
+    currency: string;
+    maxRetries?: number;
+    batchSize?: number;
+};
+
+export type ReconciliationJobResponse = {
+    id?: string;
+    provider?: string;
+    currency?: string;
+    status?: string;
+    summaryJson?: string | null;
+    startedAt?: string;
+    finishedAt?: string | null;
+    updatedAt?: string;
 };
 
 export type OrangeWebhookPayload = {
@@ -391,6 +438,51 @@ export type PostApiPaymentByPaymentIdRefundResponses = {
 };
 
 export type PostApiPaymentByPaymentIdRefundResponse = PostApiPaymentByPaymentIdRefundResponses[keyof PostApiPaymentByPaymentIdRefundResponses];
+
+export type PostApiPaymentByPaymentIdPushData = {
+    body?: never;
+    path: {
+        paymentId: string;
+    };
+    query?: never;
+    url: '/api/Payment/{paymentId}/push';
+};
+
+export type PostApiPaymentByPaymentIdPushErrors = {
+    /**
+     * Push not allowed
+     */
+    400: ApiErrorResponse;
+    /**
+     * Ownership denied
+     */
+    403: ApiErrorResponse;
+    /**
+     * Payment not found
+     */
+    404: ApiErrorResponse;
+    /**
+     * Server error
+     */
+    500: ApiErrorResponse;
+};
+
+export type PostApiPaymentByPaymentIdPushError = PostApiPaymentByPaymentIdPushErrors[keyof PostApiPaymentByPaymentIdPushErrors];
+
+export type PostApiPaymentByPaymentIdPushResponses = {
+    /**
+     * Push trigger accepted
+     */
+    200: {
+        paymentId?: string;
+        provider?: string;
+        providerReference?: string;
+        pushTriggered?: boolean;
+        status?: string;
+    };
+};
+
+export type PostApiPaymentByPaymentIdPushResponse = PostApiPaymentByPaymentIdPushResponses[keyof PostApiPaymentByPaymentIdPushResponses];
 
 export type GetApiPaymentHealthData = {
     body?: never;
@@ -691,6 +783,93 @@ export type GetApiWebhooksPendingRetriesResponses = {
 };
 
 export type GetApiWebhooksPendingRetriesResponse = GetApiWebhooksPendingRetriesResponses[keyof GetApiWebhooksPendingRetriesResponses];
+
+export type PostApiEscrowByIdExternalSettlementInitiateData = {
+    body: InitiateExternalSettlementRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/escrow/{id}/external-settlement/initiate';
+};
+
+export type PostApiEscrowByIdExternalSettlementInitiateErrors = {
+    /**
+     * Validation or business error
+     */
+    400: ApiErrorResponse;
+};
+
+export type PostApiEscrowByIdExternalSettlementInitiateError = PostApiEscrowByIdExternalSettlementInitiateErrors[keyof PostApiEscrowByIdExternalSettlementInitiateErrors];
+
+export type PostApiEscrowByIdExternalSettlementInitiateResponses = {
+    /**
+     * External settlement transfer initiated
+     */
+    200: ProviderTransferResponse;
+};
+
+export type PostApiEscrowByIdExternalSettlementInitiateResponse = PostApiEscrowByIdExternalSettlementInitiateResponses[keyof PostApiEscrowByIdExternalSettlementInitiateResponses];
+
+export type PostApiEscrowExternalSettlementCallbackData = {
+    body: ExternalSettlementCallbackApiRequest;
+    headers: {
+        /**
+         * HMAC header format: t={timestamp},v1={signature}
+         */
+        'Stpay-Signature': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/escrow/external-settlement/callback';
+};
+
+export type PostApiEscrowExternalSettlementCallbackErrors = {
+    /**
+     * Invalid callback payload
+     */
+    400: ApiErrorResponse;
+    /**
+     * Invalid callback signature
+     */
+    401: ApiErrorResponse;
+};
+
+export type PostApiEscrowExternalSettlementCallbackError = PostApiEscrowExternalSettlementCallbackErrors[keyof PostApiEscrowExternalSettlementCallbackErrors];
+
+export type PostApiEscrowExternalSettlementCallbackResponses = {
+    /**
+     * Provider callback accepted
+     */
+    200: ProviderTransferResponse;
+};
+
+export type PostApiEscrowExternalSettlementCallbackResponse = PostApiEscrowExternalSettlementCallbackResponses[keyof PostApiEscrowExternalSettlementCallbackResponses];
+
+export type PostApiEscrowExternalSettlementReconcileData = {
+    body: ReconcileExternalSettlementsRequest;
+    path?: never;
+    query?: never;
+    url: '/api/escrow/external-settlement/reconcile';
+};
+
+export type PostApiEscrowExternalSettlementReconcileErrors = {
+    /**
+     * Invalid reconciliation request
+     */
+    400: ApiErrorResponse;
+};
+
+export type PostApiEscrowExternalSettlementReconcileError = PostApiEscrowExternalSettlementReconcileErrors[keyof PostApiEscrowExternalSettlementReconcileErrors];
+
+export type PostApiEscrowExternalSettlementReconcileResponses = {
+    /**
+     * Reconciliation job completed
+     */
+    200: ReconciliationJobResponse;
+};
+
+export type PostApiEscrowExternalSettlementReconcileResponse = PostApiEscrowExternalSettlementReconcileResponses[keyof PostApiEscrowExternalSettlementReconcileResponses];
 
 export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});

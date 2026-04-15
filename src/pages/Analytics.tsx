@@ -77,8 +77,6 @@ function buildProviderData(txs: Transaction[]) {
 const PROVIDER_COLORS: Record<string, string> = {
   MTN:    '#FFCC00',
   ORANGE: '#FF6600',
-  WAVE:   '#60A5FA',
-  MOOV:   '#7EC96A',
   OTHER:  '#5A5E78',
 }
 

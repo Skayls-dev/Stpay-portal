@@ -1,5 +1,5 @@
 // src/components/layout/Sidebar.tsx
-import { NavLink, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../../hooks/useAuth'
 import { healthApi } from '../../lib/api/modules'
@@ -46,6 +46,11 @@ interface NavItem {
   badge?: { text: string; variant: 'red' | 'green' | 'amber' }; end?: boolean
 }
 
+interface NavSection {
+  label: string
+  items: NavItem[]
+}
+
 function NavBadge({ text, variant }: { text: string; variant: 'red' | 'green' | 'amber' }) {
   const s = {
     red:   'bg-[var(--red-bg)]   text-[var(--red)]',
@@ -79,7 +84,7 @@ export default function Sidebar() {
     refetchInterval: 15_000,
   })
 
-  const adminSections = [
+  const adminSections: NavSection[] = [
     {
       label: 'Pilotage',
       items: [
@@ -107,7 +112,7 @@ export default function Sidebar() {
     },
   ]
 
-  const merchantSections = [
+  const merchantSections: NavSection[] = [
     {
       label: 'Principal',
       items: [
@@ -141,7 +146,7 @@ export default function Sidebar() {
   ]
 
   const sections = isSuperAdmin ? adminSections : merchantSections
-  const initials = (user.name || user.email || 'U')
+  const initials = (user.name || 'Utilisateur')
     .split(' ').map((w: string) => w[0]?.toUpperCase()).slice(0, 2).join('')
 
   const handleLogout = () => {
@@ -154,7 +159,7 @@ export default function Sidebar() {
                       border-r border-[var(--border)] h-full select-none">
 
       <div className="px-4 py-[18px] border-b border-[var(--border-soft)]">
-        <div className="flex items-center gap-2.5">
+        <Link to="/" className="group flex items-center gap-2.5 rounded-[10px] transition-colors hover:bg-[var(--bg-hover)] px-1 py-1">
           <div className="w-8 h-8 rounded-[8px] flex items-center justify-center
                           text-white font-extrabold text-[12px] flex-shrink-0"
                style={{ background: 'var(--orange)' }}>
@@ -162,9 +167,9 @@ export default function Sidebar() {
           </div>
           <div>
             <p className="font-extrabold text-[14px] text-[var(--text-1)] leading-none tracking-tight">ST Pay</p>
-            <p className="text-[10px] text-[var(--text-4)] mt-0.5 tracking-wide">Payment Gateway</p>
+            <p className="text-[10px] text-[var(--text-4)] mt-0.5 tracking-wide group-hover:text-[var(--text-3)]">Retour a l'accueil</p>
           </div>
-        </div>
+        </Link>
         <div className="mt-2.5 inline-flex items-center gap-1.5 px-2 py-[3px] rounded-full
                         text-[10px] font-semibold font-mono border"
              style={{ background: 'var(--orange-bg)', borderColor: 'var(--orange-border)', color: 'var(--orange-dark)' }}>

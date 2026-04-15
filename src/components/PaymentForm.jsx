@@ -293,8 +293,6 @@ const PaymentForm = () => {
                     <span className="provider-icon">
                       {provider.value === 'MTN' && '📱'}
                       {provider.value === 'ORANGE' && '🍊'}
-                      {provider.value === 'WAVE' && '🌊'}
-                      {provider.value === 'MOOV' && '🔵'}
                     </span>
                     <span className="provider-name">{provider.label}</span>
                     <span className="provider-check">

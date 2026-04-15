@@ -223,6 +223,65 @@
         }
       }
     },
+    "/api/Payment/{paymentId}/push": {
+      "post": {
+        "tags": ["Payment"],
+        "parameters": [
+          { "name": "paymentId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Push trigger accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "paymentId": { "type": "string" },
+                    "provider": { "type": "string" },
+                    "providerReference": { "type": "string" },
+                    "pushTriggered": { "type": "boolean" },
+                    "status": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Push not allowed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiErrorResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "Ownership denied",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiErrorResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "Payment not found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiErrorResponse" }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/Payment/health": {
       "get": {
         "tags": ["Payment"],
@@ -553,6 +612,120 @@
           }
         }
       }
+    },
+    "/api/escrow/{id}/external-settlement/initiate": {
+      "post": {
+        "tags": ["Escrow"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/InitiateExternalSettlementRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "External settlement transfer initiated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProviderTransferResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation or business error",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/escrow/external-settlement/callback": {
+      "post": {
+        "tags": ["Escrow"],
+        "security": [],
+        "parameters": [
+          {
+            "name": "Stpay-Signature",
+            "in": "header",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "HMAC header format: t={timestamp},v1={signature}"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ExternalSettlementCallbackApiRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Provider callback accepted",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProviderTransferResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid callback signature",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiErrorResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid callback payload",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiErrorResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/escrow/external-settlement/reconcile": {
+      "post": {
+        "tags": ["Escrow"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ReconcileExternalSettlementsRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reconciliation job completed",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ReconciliationJobResponse" }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid reconciliation request",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiErrorResponse" }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -601,7 +774,7 @@
         "properties": {
           "amount": { "type": "number", "format": "double", "minimum": 1 },
           "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
-          "provider": { "type": "string", "enum": ["MTN", "ORANGE", "MOOV", "WAVE"] },
+          "provider": { "type": "string", "enum": ["MTN", "ORANGE"] },
           "customer": { "$ref": "#/components/schemas/CustomerInfo" },
           "merchant": { "$ref": "#/components/schemas/MerchantInfo" },
           "description": { "type": "string", "nullable": true, "maxLength": 500 },
@@ -837,6 +1010,67 @@
             "type": "array",
             "items": { "$ref": "#/components/schemas/WebhookSummary" }
           }
+        }
+      },
+      "InitiateExternalSettlementRequest": {
+        "type": "object",
+        "required": ["action", "provider", "destinationRef"],
+        "properties": {
+          "action": { "type": "string", "enum": ["refund_buyer", "release_merchant"] },
+          "provider": { "type": "string" },
+          "destinationRef": { "type": "string" }
+        }
+      },
+      "ExternalSettlementCallbackApiRequest": {
+        "type": "object",
+        "required": ["externalReference", "status"],
+        "properties": {
+          "externalReference": { "type": "string" },
+          "status": { "type": "string", "enum": ["success", "failed"] },
+          "providerPayload": { "type": "string", "nullable": true },
+          "failureReason": { "type": "string", "nullable": true }
+        }
+      },
+      "ProviderTransferResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "escrowId": { "type": "string", "format": "uuid" },
+          "merchantId": { "type": "string", "format": "uuid" },
+          "currency": { "type": "string" },
+          "amount": { "type": "number", "format": "double" },
+          "action": { "type": "string" },
+          "provider": { "type": "string" },
+          "destinationRef": { "type": "string" },
+          "externalReference": { "type": "string" },
+          "status": { "type": "string" },
+          "failureReason": { "type": "string", "nullable": true },
+          "requestedAt": { "type": "string", "format": "date-time" },
+          "completedAt": { "type": "string", "format": "date-time", "nullable": true },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ReconcileExternalSettlementsRequest": {
+        "type": "object",
+        "required": ["provider", "currency"],
+        "properties": {
+          "provider": { "type": "string" },
+          "currency": { "type": "string" },
+          "maxRetries": { "type": "integer", "default": 3, "minimum": 1 },
+          "batchSize": { "type": "integer", "default": 100, "minimum": 1 }
+        }
+      },
+      "ReconciliationJobResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "provider": { "type": "string" },
+          "currency": { "type": "string" },
+          "status": { "type": "string" },
+          "summaryJson": { "type": "string", "nullable": true },
+          "startedAt": { "type": "string", "format": "date-time" },
+          "finishedAt": { "type": "string", "format": "date-time", "nullable": true },
+          "updatedAt": { "type": "string", "format": "date-time" }
         }
       },
       "OrangeWebhookPayload": {

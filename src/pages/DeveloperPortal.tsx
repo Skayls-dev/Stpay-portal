@@ -668,7 +668,7 @@ public class StPayExample {
         <div><strong>API key</strong>: cle marchande envoyee dans le header X-Api-Key pour prouver l'identite du marchand.</div>
         <div><strong>Polling</strong>: technique qui consiste a reinterroger regulierement une route pour suivre un statut.</div>
         <div><strong>Webhook</strong>: appel HTTP envoye automatiquement par le backend vers votre systeme quand un evenement se produit.</div>
-        <div><strong>Provider</strong>: operateur ou canal de paiement utilise, par exemple MTN, ORANGE, MOOV ou WAVE.</div>
+        <div><strong>Provider</strong>: operateur ou canal de paiement utilise, par exemple MTN ou ORANGE.</div>
         <div><strong>transactionId</strong>: identifiant unique d'un paiement. Gardez-le toujours pour suivre le paiement ou le rembourser.</div>
       </div>
     </div>
@@ -765,7 +765,7 @@ function buildApiError(input: { message?: string; status?: number; body?: unknow
     body: input.body,
     url: input.url,
     hint: providerInvalid
-      ? 'Provider invalide. Utilisez une valeur acceptee par l API: MTN, ORANGE, MOOV ou WAVE.'
+      ? 'Provider invalide. Utilisez une valeur acceptee par l API: MTN ou ORANGE.'
       : getApiHint(input.status, input.url),
   }
 }
@@ -1696,7 +1696,7 @@ client.escrow.dispute('ESC-XXXXXXXX', reason='Article non conforme à la descrip
     },
     {
       q: 'L\'escrow est-il disponible pour tous les opérateurs ?',
-      a: <>Oui — l'escrow est indépendant de l'opérateur mobile money (MTN, Orange, Wave, Moov). La rétention des fonds se fait côté ST Pay, pas côté opérateur.</>,
+      a: <>Oui — l'escrow est indépendant de l'opérateur mobile money (MTN, Orange). La rétention des fonds se fait côté ST Pay, pas côté opérateur.</>,
     },
     {
       q: 'Le vendeur est-il notifié à chaque étape ?',
@@ -2815,7 +2815,7 @@ const client = new StPay({ apiKey: process.env.STPAY_API_KEY });
 const payment = await client.payments.create({
   amount: 5000,
   currency: 'XAF',
-  provider: 'MTN',      // MTN | ORANGE | WAVE | MOOV
+  provider: 'MTN',      // MTN | ORANGE
   customer: {
     phoneNumber: '237677123456',
     name: 'Jean Mbarga',
@@ -2874,7 +2874,7 @@ client = StPayClient(api_key=os.environ['STPAY_API_KEY'])
 payment = client.payments.create(
     amount=5000,
     currency='XAF',
-    provider='MTN',          # MTN | ORANGE | WAVE | MOOV
+    provider='MTN',          # MTN | ORANGE
     customer={'phone_number': '237677123456', 'name': 'Jean Mbarga'},
     merchant={
         'reference': 'ORDER-001',
@@ -3079,7 +3079,7 @@ const client = new StPay({ apiKey: process.env.STPAY_API_KEY });
 const [p1, p2, p3] = await Promise.all([
   client.payments.create({ amount: 1000, currency: 'XAF', provider: 'MTN',    customer: { phoneNumber: '237677111111' }, merchant: { reference: 'A' } }),
   client.payments.create({ amount: 2000, currency: 'XAF', provider: 'ORANGE', customer: { phoneNumber: '237655222222' }, merchant: { reference: 'B' } }),
-  client.payments.create({ amount: 3000, currency: 'XAF', provider: 'WAVE',   customer: { phoneNumber: '237699333333' }, merchant: { reference: 'C' } }),
+  client.payments.create({ amount: 3000, currency: 'XAF', provider: 'MTN',    customer: { phoneNumber: '237699333333' }, merchant: { reference: 'C' } }),
 ]);
 console.log(p1.transactionId, p2.transactionId, p3.transactionId);`,
 
@@ -3335,7 +3335,7 @@ def stpay_webhook(request):
                 <pre className="p-3 text-[11px] font-mono text-[var(--text-1)] leading-relaxed whitespace-pre-wrap overflow-x-auto">{code.payment[sdk]}</pre>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {[['MTN','Mobile Money','237677…'],['ORANGE','Orange Money','237655…'],['WAVE','Wave','237699…'],['MOOV','Moov Money','237670…']].map(([p, name, prefix]) => (
+                {[['MTN','Mobile Money','237677…'],['ORANGE','Orange Money','237655…']].map(([p, name, prefix]) => (
                   <div key={p} className="rounded-[6px] border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-2 text-[10px] flex flex-col gap-0.5">
                     <span className="font-semibold text-[var(--text-1)]">{p}</span>
                     <span className="text-[var(--text-3)]">{name}</span>
@@ -3814,8 +3814,6 @@ function StatusTab() {
   const PROVIDER_INFO: Record<string, { name: string; desc: string; color: string }> = {
     MTN:    { name: 'MTN Mobile Money',  desc: "Cameroun, Côte d'Ivoire, Ghana", color: '#FFC700' },
     ORANGE: { name: 'Orange Money',      desc: 'Orange Money multi-pays',         color: '#FF6600' },
-    WAVE:   { name: 'Wave',              desc: 'Wave wallet',                     color: '#3B82F6' },
-    MOOV:   { name: 'Moov Money',        desc: 'Moov Money',                      color: '#22C55E' },
   }
 
   const OBS_ENDPOINTS = [

@@ -45,6 +45,4 @@ export const demoCatalog: DemoProduct[] = [
 export const demoProviders = [
   { value: 'MTN', label: 'MTN Mobile Money' },
   { value: 'ORANGE', label: 'Orange Money' },
-  { value: 'WAVE', label: 'Wave' },
-  { value: 'MOOV', label: 'Moov Money' },
 ] as const

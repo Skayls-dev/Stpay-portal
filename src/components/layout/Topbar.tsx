@@ -42,6 +42,9 @@ export default function Topbar() {
       )}
 
       <div className="flex items-center gap-2">
+        <button className="btn-secondary" onClick={() => navigate('/')}>
+          Accueil
+        </button>
         <button className="btn-secondary">
           <IconSearch />
           Rechercher
