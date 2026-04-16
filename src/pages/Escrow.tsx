@@ -4,7 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { escrowApi } from '../lib/api/modules'
+import { escrowApi, appsApi } from '../lib/api/modules'
+import type { MerchantApp } from '../lib/api/modules'
 import { Badge, Button } from '../components/ui'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -70,6 +71,155 @@ const STATUS_CONFIG = {
   delivered: { label: 'Livré',       color: 'emerald' as const },
   released:  { label: 'Libéré',      color: 'slate'   as const },
   disputed:  { label: 'Litige',      color: 'red'     as const },
+}
+
+// ─── Simulate modal ───────────────────────────────────────────────────────────
+
+interface SimulateFormState {
+  amount: string
+  currency: string
+  customerPhone: string
+  description: string
+  releaseMode: string
+  autoTimeoutDays: string
+}
+
+const DEFAULT_SIM: SimulateFormState = {
+  amount: '50000',
+  currency: 'XAF',
+  customerPhone: '+237600000000',
+  description: '',
+  releaseMode: 'pickup_code',
+  autoTimeoutDays: '7',
+}
+
+function SimulateModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+  const [form, setForm] = useState<SimulateFormState>(DEFAULT_SIM)
+  const [loading, setLoading] = useState(false)
+
+  const field = (key: keyof SimulateFormState) => ({
+    value: form[key],
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+      setForm(prev => ({ ...prev, [key]: e.target.value })),
+  })
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const amount = parseFloat(form.amount)
+    if (!amount || amount <= 0) { toast.error('Montant invalide'); return }
+    setLoading(true)
+    try {
+      await escrowApi.simulate({
+        amount,
+        currency: form.currency,
+        customerPhone: form.customerPhone || '+237000000000',
+        description: form.description || undefined,
+        releaseMode: form.releaseMode,
+        autoTimeoutDays: form.releaseMode === 'auto_timeout' ? parseInt(form.autoTimeoutDays) || 7 : undefined,
+      })
+      toast.success('Simulation créée avec succès')
+      onSuccess()
+      onClose()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erreur lors de la simulation')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const inputCls = `w-full h-9 px-3 text-[13px] border border-[var(--border)] rounded-[6px]
+    bg-white text-[var(--text-1)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)/30]
+    focus:border-[var(--primary)] transition-colors`
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+         onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-white rounded-[var(--radius-lg)] shadow-2xl w-full max-w-md mx-4
+                      border border-[var(--border)] animate-in fade-in-0 zoom-in-95 duration-150">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-soft)]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-[var(--amber-bg)] flex items-center justify-center">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                <rect x="2" y="5" width="12" height="8" rx="1.5" stroke="var(--amber)" strokeWidth="1.4"/>
+                <path d="M5 5V4a3 3 0 016 0v1" stroke="var(--amber)" strokeWidth="1.4" strokeLinecap="round"/>
+                <circle cx="8" cy="9" r="1.5" fill="var(--amber)"/>
+              </svg>
+            </div>
+            <div>
+              <p className="text-[14px] font-semibold text-[var(--text-1)]">Simuler un séquestre</p>
+              <p className="text-[11px] text-[var(--text-4)]">Crée une transaction de test en mode séquestre</p>
+            </div>
+          </div>
+          <button onClick={onClose}
+                  className="w-7 h-7 rounded-full flex items-center justify-center
+                             text-[var(--text-4)] hover:bg-[var(--bg-hover)] transition-colors">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-medium text-[var(--text-3)] uppercase tracking-wide">Montant</label>
+              <input type="number" min="1" step="1" required className={inputCls} placeholder="50000" {...field('amount')}/>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-medium text-[var(--text-3)] uppercase tracking-wide">Devise</label>
+              <select className={inputCls} {...field('currency')}>
+                <option value="XAF">XAF</option>
+                <option value="EUR">EUR</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-medium text-[var(--text-3)] uppercase tracking-wide">Téléphone acheteur</label>
+            <input type="tel" className={inputCls} placeholder="+237600000000" {...field('customerPhone')}/>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-medium text-[var(--text-3)] uppercase tracking-wide">Mode de libération</label>
+            <select className={inputCls} {...field('releaseMode')}>
+              <option value="pickup_code">Code de retrait (PickupCode)</option>
+              <option value="auto_timeout">Délai automatique (AutoTimeout)</option>
+              <option value="dual_confirm">Double confirmation (DualConfirm)</option>
+            </select>
+          </div>
+
+          {form.releaseMode === 'auto_timeout' && (
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-medium text-[var(--text-3)] uppercase tracking-wide">Délai (jours)</label>
+              <input type="number" min="1" max="90" className={inputCls} placeholder="7" {...field('autoTimeoutDays')}/>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-medium text-[var(--text-3)] uppercase tracking-wide">Description (optionnel)</label>
+            <input type="text" maxLength={200} className={inputCls} placeholder="Ex: Achat téléphone…" {...field('description')}/>
+          </div>
+
+          <div className="flex items-center gap-2.5 pt-1">
+            <button type="button" onClick={onClose}
+                    className="flex-1 h-9 text-[13px] font-medium rounded-[6px] border border-[var(--border)]
+                               text-[var(--text-2)] hover:bg-[var(--bg-hover)] transition-colors">
+              Annuler
+            </button>
+            <button type="submit" disabled={loading}
+                    className="flex-1 h-9 text-[13px] font-semibold rounded-[6px]
+                               bg-[var(--amber)] text-white hover:opacity-90 transition-opacity
+                               disabled:opacity-50 disabled:cursor-not-allowed">
+              {loading ? 'Création…' : 'Créer la simulation'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
 }
 
 // ─── KPI card ─────────────────────────────────────────────────────────────────
@@ -154,6 +304,7 @@ function EscrowCard({ item, role, isSuperAdmin }: { item: EscrowItem; role: 'mer
     mutationFn: () => escrowApi.ship(item.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['escrow'] })
+      queryClient.invalidateQueries({ queryKey: ['merchant-balance'] })
       toast.success('Expédition confirmée')
     },
     onError: () => toast.error('Erreur lors de la confirmation'),
@@ -163,6 +314,7 @@ function EscrowCard({ item, role, isSuperAdmin }: { item: EscrowItem; role: 'mer
     mutationFn: () => escrowApi.release(item.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['escrow'] })
+      queryClient.invalidateQueries({ queryKey: ['merchant-balance'] })
       toast.success(`Fonds libérés pour ${item.ref}`)
     },
     onError: () => toast.error('Impossible de libérer les fonds'),
@@ -172,6 +324,7 @@ function EscrowCard({ item, role, isSuperAdmin }: { item: EscrowItem; role: 'mer
     mutationFn: (reason: string) => escrowApi.openDispute(item.id, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['escrow'] })
+      queryClient.invalidateQueries({ queryKey: ['merchant-balance'] })
       toast('Litige ouvert')
       setDisputeOpen(false)
       setDisputeReason('')
@@ -183,6 +336,7 @@ function EscrowCard({ item, role, isSuperAdmin }: { item: EscrowItem; role: 'mer
     mutationFn: () => escrowApi.buyerConfirm(item.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['escrow'] })
+      queryClient.invalidateQueries({ queryKey: ['merchant-balance'] })
       toast.success('Livraison confirmée')
     },
     onError: () => toast.error('Erreur lors de la confirmation de livraison'),
@@ -192,6 +346,7 @@ function EscrowCard({ item, role, isSuperAdmin }: { item: EscrowItem; role: 'mer
     mutationFn: (code: string) => escrowApi.confirmPickup(item.id, code),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['escrow'] })
+      queryClient.invalidateQueries({ queryKey: ['merchant-balance'] })
       toast.success('Livraison confirmée !')
       setPickupOpen(false)
       setPickupCodeInput('')
@@ -397,15 +552,25 @@ function EscrowCard({ item, role, isSuperAdmin }: { item: EscrowItem; role: 'mer
 export default function Escrow() {
   const navigate = useNavigate()
   const { isSuperAdmin, user, role } = useAuth()
+  const queryClient = useQueryClient()
   const [filter, setFilter] = useState<'all' | EscrowItem['status']>('all')
+  const [appFilter, setAppFilter] = useState('')
+  const [simOpen, setSimOpen] = useState(false)
   const merchantApiKey = typeof window !== 'undefined' ? localStorage.getItem('stpay_api_key') : null
   const missingApiKey = role === 'merchant' && !merchantApiKey
 
+  const { data: apps = [] } = useQuery<MerchantApp[]>({
+    queryKey: ['merchant-apps'],
+    queryFn: () => appsApi.list(),
+    enabled: !isSuperAdmin,
+  })
+
   const { data = [], isLoading, error } = useQuery({
-    queryKey: ['escrow', role, user.merchantId, filter],
+    queryKey: ['escrow', role, user.merchantId, filter, appFilter],
     queryFn: () => escrowApi.list(
       role === 'merchant' ? user.merchantId : undefined,
       filter !== 'all' ? filter : undefined,
+      appFilter || undefined,
     ),
     enabled: !missingApiKey,
     refetchInterval: 30_000,
@@ -454,6 +619,13 @@ export default function Escrow() {
 
   return (
     <div className="space-y-4">
+      {simOpen && (
+        <SimulateModal
+          onClose={() => setSimOpen(false)}
+          onSuccess={() => queryClient.invalidateQueries({ queryKey: ['escrow'] })}
+        />
+      )}
+
       {missingApiKey && (
         <div className="rounded-[var(--radius-md)] border border-[var(--amber-border)] bg-[var(--amber-bg)] p-4">
           <p className="text-[13px] font-semibold text-[var(--amber)]">Clé API manquante</p>
@@ -507,33 +679,63 @@ export default function Escrow() {
       </div>
 
       {/* ── Filter tabs ── */}
-      <div className="flex items-center gap-1 bg-[var(--bg-overlay)] p-1
-                      rounded-[var(--radius-sm)] w-fit">
-        {FILTERS.map(({ key, label }) => {
-          const count = key === 'all' ? items.length
-                      : items.filter((i) => i.status === key).length
-          return (
-            <button
-              key={key}
-              onClick={() => setFilter(key)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[4px]
-                          text-[12px] transition-colors
-                          ${filter === key
-                            ? 'bg-[var(--bg-subtle)] text-[var(--text-primary)] font-medium'
-                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
-            >
-              {label}
-              {count > 0 && (
-                <span className={`text-[10px] font-mono px-1 rounded
-                                  ${filter === key
-                                    ? 'text-[var(--gold)]'
-                                    : 'text-[var(--text-muted)]'}`}>
-                  {count}
-                </span>
-              )}
-            </button>
-          )
-        })}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1 bg-[var(--bg-overlay)] p-1
+                        rounded-[var(--radius-sm)]">
+          {FILTERS.map(({ key, label }) => {
+            const count = key === 'all' ? items.length
+                        : items.filter((i) => i.status === key).length
+            return (
+              <button
+                key={key}
+                onClick={() => setFilter(key)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[4px]
+                            text-[12px] transition-colors
+                            ${filter === key
+                              ? 'bg-[var(--bg-subtle)] text-[var(--text-primary)] font-medium'
+                              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+              >
+                {label}
+                {count > 0 && (
+                  <span className={`text-[10px] font-mono px-1 rounded
+                                    ${filter === key
+                                      ? 'text-[var(--gold)]'
+                                      : 'text-[var(--text-muted)]'}`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+        {!isSuperAdmin && apps.length > 0 && (
+          <select
+            value={appFilter}
+            onChange={(e) => setAppFilter(e.target.value)}
+            className="h-8 px-2 text-[12px] border border-[var(--border)] rounded-[6px]
+                       bg-white text-[var(--text-2)] focus:outline-none focus:ring-1
+                       focus:ring-[var(--primary)] min-w-[160px]"
+          >
+            <option value="">Toutes les apps</option>
+            {apps.map((a: MerchantApp) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </select>
+        )}
+        {!isSuperAdmin && !missingApiKey && (
+          <button
+            onClick={() => setSimOpen(true)}
+            className="ml-auto h-8 px-3.5 flex items-center gap-1.5 rounded-[6px]
+                       bg-[var(--amber-bg)] border border-[var(--amber-border)]
+                       text-[var(--amber)] text-[12px] font-semibold
+                       hover:bg-[var(--amber)]/15 transition-colors"
+          >
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+              <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+            </svg>
+            Simuler
+          </button>
+        )}
       </div>
 
       {/* ── Cards grid ── */}

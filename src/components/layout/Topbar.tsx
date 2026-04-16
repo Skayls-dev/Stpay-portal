@@ -55,6 +55,11 @@ export default function Topbar() {
             Simulation
           </button>
         )}
+        {isSuperAdmin && (
+          <button className="btn-secondary" onClick={() => navigate('/demo/escrow')}>
+            Démo Escrow
+          </button>
+        )}
       </div>
     </header>
   )

@@ -6,7 +6,7 @@ export type ApiClientError = Error & {
   url?: string
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE || 'http://localhost:5169'
+const API_BASE_URL = import.meta.env.VITE_API_BASE ?? ''
 
 const client = axios.create({
   baseURL: API_BASE_URL,
@@ -42,6 +42,11 @@ const AUTH_STORAGE_KEYS = [
 client.interceptors.response.use(
   (response) => response,
   (error) => {
+    // No response means the backend is unreachable (down / restarted / network issue)
+    if (!error?.response) {
+      window.dispatchEvent(new CustomEvent('stpay:backend-unreachable'))
+    }
+
     const requestUrl = String(error?.config?.url || '')
     const responseMessage = String(error?.response?.data?.message || error?.response?.data?.Error || '').toLowerCase()
     const isApiKeyAuthFailure = responseMessage.includes('api key')

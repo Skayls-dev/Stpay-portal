@@ -3,7 +3,7 @@ import React, { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { analyticsApi, transactionsApi, POLL_INTERVAL_TRANSACTIONS } from '../lib/api/modules'
+import { analyticsApi, transactionsApi, balanceApi, POLL_INTERVAL_TRANSACTIONS } from '../lib/api/modules'
 import { Badge, DataTable } from '../components/ui'
 import { IconArrowUp, IconArrowDown } from '../components/icons/NavIcons'
 import type { DataTableColumn } from '../components/ui'
@@ -124,7 +124,7 @@ function ProvidersPanel() {
 }
 
 // ─── Escrow panel ─────────────────────────────────────────────────────────────
-function EscrowPanel() {
+function EscrowPanel({ reservedBalance }: { reservedBalance?: number }) {
   return (
     <div className="panel">
       <div className="panel-header">
@@ -138,42 +138,13 @@ function EscrowPanel() {
           </p>
           <p className="font-extrabold text-[22px] tracking-tight leading-none"
              style={{ color: 'var(--orange)' }}>
-            12 450 000
+            {reservedBalance != null
+              ? new Intl.NumberFormat('fr-FR').format(reservedBalance)
+              : '—'}
           </p>
           <p className="text-[11px] text-[var(--text-3)] mt-1">
-            XAF · 3 livraisons en attente
+            XAF · fonds en séquestre actif
           </p>
-        </div>
-        <div>
-          <div className="flex justify-between text-[10px] mb-1">
-            <span className="text-[var(--text-3)]">Libéré ce mois</span>
-            <span className="font-semibold" style={{ color: 'var(--orange)' }}>68 %</span>
-          </div>
-          <div className="h-[3px] bg-[var(--border-soft)] rounded-full overflow-hidden">
-            <div className="h-full rounded-full" style={{ width: '68%', background: 'var(--orange)' }} />
-          </div>
-        </div>
-        <div className="space-y-1.5">
-          {[
-            { ref: 'ESC-BRU-KIN-0042', amt: '85 000 XAF', status: 'pending', label: 'En transit' },
-            { ref: 'ESC-CDK-ABJ-0018', amt: '42 500 XAF', status: 'success', label: 'Livré' },
-          ].map((item) => (
-            <div key={item.ref}
-                 className="flex items-center justify-between px-3 py-2
-                            bg-[var(--bg-subtle)] rounded-[var(--r-sm)]
-                            border border-[var(--border-soft)]">
-              <div>
-                <p className="text-[10px] font-mono text-[var(--text-2)]">{item.ref}</p>
-                <p className="text-[9px] text-[var(--text-4)] mt-0.5">Code : ●●●●●●</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[11px] font-bold font-mono text-[var(--text-1)]">{item.amt}</p>
-                <Badge color={item.status === 'success' ? 'emerald' : 'amber'} dot className="mt-0.5">
-                  {item.label}
-                </Badge>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
     </div>
@@ -315,6 +286,13 @@ export default function Overview() {
     enabled: isSuperAdmin,
   })
 
+  const { data: merchantBalance } = useQuery({
+    queryKey: ['merchant-balance'],
+    queryFn: balanceApi.get,
+    staleTime: 60_000,
+    enabled: !isSuperAdmin,
+  })
+
   const kpis = useMemo(() => {
     if (!stats) return null
     const total = stats.totalAmount ?? 0
@@ -389,8 +367,10 @@ export default function Overview() {
             icon={<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2.5 7L5 9.5l5.5-5.5" stroke="var(--green)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>}
           />
           <KpiCard label="Escrow actif"
-            value="12.4M"
-            delta={{ text: '3 en attente', up: null }}
+            value={merchantBalance
+              ? `${(merchantBalance.reservedBalance / 1_000_000).toFixed(1)}M`
+              : '—'}
+            delta={{ text: 'fonds séquestrés', up: null }}
             iconBg="bg-[var(--amber-bg)]"
             icon={<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1.5" y="4" width="10" height="8" rx="1.5" stroke="var(--amber)" strokeWidth="1.2"/><path d="M4.5 4V3a2.5 2.5 0 015 0v1" stroke="var(--amber)" strokeWidth="1.2" strokeLinecap="round"/></svg>}
           />
@@ -428,7 +408,7 @@ export default function Overview() {
               <AdminOpsPanel />
             </>
           ) : (
-            <EscrowPanel />
+            <EscrowPanel reservedBalance={merchantBalance?.reservedBalance} />
           )}
         </div>
       </div>

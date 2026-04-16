@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { demoCatalog, demoProviders, type DemoProduct } from './mockCatalog'
 
@@ -13,6 +13,7 @@ type CheckoutMode = 'simulated' | 'live'
 type DemoFlowMode = 'widget' | 'api'
 type PhoneModalMode = 'widget' | 'api' | null
 type EscrowMode = 'pickup_code' | 'auto_timeout' | 'dual_confirm'
+type EscrowStep = 'held' | 'in_transit' | 'delivered' | 'released'
 type CheckoutErrors = {
   name: string
   phone: string
@@ -70,6 +71,235 @@ const PROVIDER_PHONE_THEME: Record<string, {
   },
 }
 
+const ESCROW_STEPS: EscrowStep[] = ['held', 'in_transit', 'delivered', 'released']
+const ESCROW_STEP_LABELS: Record<EscrowStep, string> = {
+  held: 'Retenu',
+  in_transit: 'En transit',
+  delivered: 'Livré',
+  released: 'Libéré',
+}
+
+function EscrowLifecycleStepper({
+  step,
+  setStep,
+  releaseMode,
+  pickupCode,
+}: {
+  step: EscrowStep
+  setStep: (s: EscrowStep) => void
+  releaseMode: EscrowMode
+  pickupCode: string | null
+}) {
+  const currentIdx = ESCROW_STEPS.indexOf(step)
+  const [countdown, setCountdown] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (releaseMode !== 'auto_timeout' || step !== 'in_transit') return
+    setCountdown(10)
+    const interval = setInterval(() => {
+      setCountdown((n) => {
+        if (n === null || n <= 1) {
+          clearInterval(interval)
+          setStep('delivered')
+          setTimeout(() => setStep('released'), 600)
+          return null
+        }
+        return n - 1
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [step, releaseMode])
+
+  const handleSimulateTimeout = () => {
+    setStep('delivered')
+    setTimeout(() => setStep('released'), 800)
+  }
+
+  return (
+    <div className="mt-3 space-y-3 rounded-[12px] border border-[var(--border-soft)] bg-white p-4">
+      {/* Progress bar */}
+      <div className="space-y-1">
+        <div className="flex gap-1">
+          {ESCROW_STEPS.map((s, idx) => (
+            <div
+              key={s}
+              className="h-1.5 flex-1 rounded-full transition-colors duration-300"
+              style={{
+                background:
+                  idx < currentIdx
+                    ? 'var(--green)'
+                    : idx === currentIdx
+                    ? 'var(--orange)'
+                    : 'var(--border)',
+              }}
+            />
+          ))}
+        </div>
+        <div className="flex">
+          {ESCROW_STEPS.map((s, idx) => (
+            <div
+              key={s}
+              className="flex-1 text-center text-[9px] font-semibold transition-colors"
+              style={{
+                color:
+                  idx < currentIdx
+                    ? 'var(--green)'
+                    : idx === currentIdx
+                    ? 'var(--orange)'
+                    : 'var(--text-3)',
+              }}
+            >
+              {ESCROW_STEP_LABELS[s]}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Step content */}
+      <div className="space-y-2">
+        {/* ── pickup_code ── */}
+        {releaseMode === 'pickup_code' && step === 'held' && (
+          <>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--orange-border)] bg-[var(--orange-bg)] px-3 py-1 text-[11px] font-semibold text-[var(--orange-dark)]">
+              🔒 Fonds retenus
+            </span>
+            <button
+              type="button"
+              className="btn-secondary mt-2 w-full justify-center"
+              onClick={() => setStep('in_transit')}
+            >
+              Confirmer expédition
+            </button>
+          </>
+        )}
+        {releaseMode === 'pickup_code' && step === 'in_transit' && (
+          <>
+            <label className="block space-y-1">
+              <span className="text-[11px] font-semibold text-[var(--text-2)]">Code de retrait</span>
+              <div className="space-y-1">
+                <input
+                  readOnly
+                  value={pickupCode ?? '482 931'}
+                  className="w-full rounded-[10px] border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-2 text-[14px] font-mono tracking-[0.2em] text-[var(--text-1)]"
+                />
+                {pickupCode !== null ? (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[var(--orange-border)] bg-[var(--orange-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--orange-dark)]">
+                    🔑 Code réel API
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-3)]">
+                    🎭 Code simulé
+                  </span>
+                )}
+              </div>
+            </label>
+            <button
+              type="button"
+              className="btn-primary w-full justify-center"
+              onClick={() => setStep('delivered')}
+            >
+              Valider le code
+            </button>
+          </>
+        )}
+        {releaseMode === 'pickup_code' && step === 'delivered' && (
+          <button
+            type="button"
+            className="btn-primary w-full justify-center"
+            onClick={() => setStep('released')}
+          >
+            Libérer les fonds
+          </button>
+        )}
+        {releaseMode === 'pickup_code' && step === 'released' && (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--green-border)] bg-[var(--green-bg)] px-3 py-1 text-[11px] font-semibold text-[var(--green)]">
+            ✅ Fonds libérés au marchand
+          </span>
+        )}
+
+        {/* ── auto_timeout ── */}
+        {releaseMode === 'auto_timeout' && step === 'held' && (
+          <>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--orange-border)] bg-[var(--orange-bg)] px-3 py-1 text-[11px] font-semibold text-[var(--orange-dark)]">
+              🔒 Fonds retenus
+            </span>
+            <button
+              type="button"
+              className="btn-secondary mt-2 w-full justify-center"
+              onClick={() => setStep('in_transit')}
+            >
+              Confirmer expédition
+            </button>
+          </>
+        )}
+        {releaseMode === 'auto_timeout' && step === 'in_transit' && (
+          <div className="space-y-2">
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors duration-500"
+              style={{
+                borderColor: countdown !== null && countdown <= 3 ? 'var(--green-border)' : 'var(--amber-border)',
+                background: countdown !== null && countdown <= 3 ? 'var(--green-bg)' : 'var(--amber-bg)',
+                color: countdown !== null && countdown <= 3 ? 'var(--green)' : 'var(--amber)',
+              }}
+            >
+              ⏱ Libération automatique dans {countdown ?? 0}s
+            </span>
+            <div className="overflow-hidden rounded-full bg-[var(--bg-subtle)]" style={{ height: 4 }}>
+              <div
+                className="h-full rounded-full bg-[var(--orange)] transition-all duration-1000 ease-linear"
+                style={{ width: `${((countdown ?? 0) / 10) * 100}%` }}
+              />
+            </div>
+            <p className="text-[10px] text-[var(--text-3)]">Simule le timeout de 7 jours en 10 secondes</p>
+          </div>
+        )}
+        {releaseMode === 'auto_timeout' && step === 'delivered' && (
+          <p className="text-[11px] text-[var(--text-2)]">Libération automatique en cours...</p>
+        )}
+        {releaseMode === 'auto_timeout' && step === 'released' && (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--green-border)] bg-[var(--green-bg)] px-3 py-1 text-[11px] font-semibold text-[var(--green)]">
+            ✅ Fonds libérés au marchand
+          </span>
+        )}
+
+        {/* ── dual_confirm ── */}
+        {releaseMode === 'dual_confirm' && step === 'held' && (
+          <button
+            type="button"
+            className="btn-secondary w-full justify-center"
+            onClick={() => setStep('in_transit')}
+          >
+            Confirmer expédition
+          </button>
+        )}
+        {releaseMode === 'dual_confirm' && step === 'in_transit' && (
+          <button
+            type="button"
+            className="btn-primary w-full justify-center"
+            onClick={() => setStep('delivered')}
+          >
+            Confirmer réception
+          </button>
+        )}
+        {releaseMode === 'dual_confirm' && step === 'delivered' && (
+          <button
+            type="button"
+            className="btn-primary w-full justify-center"
+            onClick={() => setStep('released')}
+          >
+            Libérer les fonds
+          </button>
+        )}
+        {releaseMode === 'dual_confirm' && step === 'released' && (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--green-border)] bg-[var(--green-bg)] px-3 py-1 text-[11px] font-semibold text-[var(--green)]">
+            ✅ Fonds libérés au marchand
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function WebshopDemoFeature() {
   const [cart, setCart] = useState<Record<string, number>>({})
   const [payerName, setPayerName] = useState('Client Demo')
@@ -93,6 +323,8 @@ export default function WebshopDemoFeature() {
   const [checkoutErrors, setCheckoutErrors] = useState<CheckoutErrors>({ name: '', phone: '' })
   const [escrowEnabled, setEscrowEnabled] = useState(false)
   const [escrowMode, setEscrowMode] = useState<EscrowMode>('pickup_code')
+  const [escrowStep, setEscrowStep] = useState<EscrowStep>('held')
+  const [pickupCode, setPickupCode] = useState<string | null>(null)
 
   const lines = useMemo<CartLine[]>(() => {
     return demoCatalog
@@ -182,7 +414,7 @@ export default function WebshopDemoFeature() {
     setStatus('creating')
     setStatusInfo('Tentative API live en cours...')
     const generatedTx = `DEMO-${Date.now().toString().slice(-8)}`
-    const baseUrl = import.meta.env.VITE_API_BASE || 'http://localhost:5169'
+    const baseUrl = import.meta.env.VITE_API_BASE ?? ''
     const apiKey = typeof window !== 'undefined' ? localStorage.getItem('stpay_api_key') : null
     const token = typeof window !== 'undefined' ? localStorage.getItem('stpay_token') : null
 
@@ -235,9 +467,11 @@ export default function WebshopDemoFeature() {
         const body = await response.json() as {
           transactionId?: string
           id?: string
-          escrow?: { escrowId?: string; status?: string }
+          escrow?: { escrowId?: string; status?: string; pickupCode?: string }
         }
         const liveTx = body.transactionId || body.id || generatedTx
+        const livePickupCode = body.escrow?.pickupCode ?? null
+        if (livePickupCode) setPickupCode(livePickupCode)
         setMode('live')
         setTxId(liveTx)
         setStatusInfo(
@@ -267,7 +501,7 @@ export default function WebshopDemoFeature() {
   }
 
   const triggerOrangePush = async (paymentId: string) => {
-    const baseUrl = import.meta.env.VITE_API_BASE || 'http://localhost:5169'
+    const baseUrl = import.meta.env.VITE_API_BASE ?? ''
     const apiKey = typeof window !== 'undefined' ? localStorage.getItem('stpay_api_key') : null
     const token = typeof window !== 'undefined' ? localStorage.getItem('stpay_token') : null
 
@@ -307,6 +541,8 @@ export default function WebshopDemoFeature() {
     setApiAuthError('')
     setApiAuthStage('auth')
     setPhoneModalMode(null)
+    setEscrowStep('held')
+    setPickupCode(null)
   }
 
   const openWidget = () => {
@@ -730,6 +966,14 @@ export default function WebshopDemoFeature() {
                     </button>
                   )}
                   {statusInfo && <p className="mt-2 text-[11px] text-[var(--text-2)]">{statusInfo}</p>}
+                  {status === 'success' && escrowEnabled && (
+                    <EscrowLifecycleStepper
+                      step={escrowStep}
+                      setStep={setEscrowStep}
+                      releaseMode={escrowMode}
+                      pickupCode={pickupCode}
+                    />
+                  )}
                 </div>
               </div>
             </div>

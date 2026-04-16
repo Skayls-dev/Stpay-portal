@@ -23,7 +23,9 @@ import PortalSelect from './pages/PortalSelect';
 import LandingPage from './pages/LandingPage';
 const DeveloperPortal  = React.lazy(() => import('./pages/DeveloperPortal'));
 const PaymentSimulator = React.lazy(() => import('./pages/PaymentSimulator'));
-const WebshopPublicDemo = React.lazy(() => import('./pages/WebshopPublicDemo'));const IntegrationGuides = React.lazy(() => import('./pages/IntegrationGuides'));import AdminConfig from './pages/AdminConfig';
+const WebshopPublicDemo = React.lazy(() => import('./pages/WebshopPublicDemo'));
+const EscrowDemoPage = React.lazy(() => import('./pages/EscrowDemo'));
+const IntegrationGuides = React.lazy(() => import('./pages/IntegrationGuides'));import AdminConfig from './pages/AdminConfig';
 
 function HomeRedirect() {
   const { isAuthenticated, isSuperAdmin } = useAuth();
@@ -68,6 +70,7 @@ function App() {
         <Route path="/admin/login"    element={<Login portal="admin" />} />
         <Route path="/register"       element={<MerchantRegister />} />
         <Route path="/demo/webshop"   element={<WebshopPublicDemo />} />
+        <Route path="/demo/escrow"    element={<EscrowDemoPage />} />
         <Route path="/" element={<LandingPage />} />
 
         <Route path="/admin" element={<RequireAuth><RequireRole role="super_admin"><DashboardLayout /></RequireRole></RequireAuth>}>

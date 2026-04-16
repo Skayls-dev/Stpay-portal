@@ -81,10 +81,14 @@ export interface Transaction {
   status: string
   merchantId?: string
   merchantName?: string
+  customerPhone?: string
+  customerName?: string
   createdAt?: string
   updatedAt?: string
   description?: string
   paymentUrl?: string
+  applicationId?: string
+  applicationName?: string
   escrow?: {
     escrowId: string
     status: string
@@ -262,8 +266,14 @@ interface TransactionSummaryDto {
   merchantId?: string
   merchantName?: string
   merchantRef?: string
+  customerPhone?: string
+  customerName?: string
   createdAt?: string
   completedAt?: string
+  escrowId?: string
+  escrowStatus?: string
+  applicationId?: string
+  applicationName?: string
 }
 
 interface PagedTransactionSummaryDto {
@@ -307,8 +317,15 @@ const toTransactionFromSummary = (item: TransactionSummaryDto): Transaction => (
   status: item.status,
   merchantId: item.merchantId ?? item.merchantRef,
   merchantName: item.merchantName,
+  customerPhone: item.customerPhone,
+  customerName: item.customerName,
   createdAt: item.createdAt,
   updatedAt: item.completedAt,
+  applicationId: item.applicationId,
+  applicationName: item.applicationName,
+  escrow: item.escrowId && item.escrowStatus
+    ? { escrowId: item.escrowId, status: item.escrowStatus, releaseMode: 'PickupCode' }
+    : undefined,
 })
 
 const parseTransactionListPayload = (payload: unknown): Transaction[] => {
@@ -366,17 +383,16 @@ const statusTextMap: Record<string, string> = {
 }
 
 export const transactionsApi = {
-  async list(filters?: { status?: string; provider?: string; merchantId?: string }): Promise<Transaction[]> {
-    const response = await client.get('/api/payment')
+  async list(filters?: { status?: string; provider?: string; merchantId?: string; from?: string; to?: string; appId?: string }): Promise<Transaction[]> {
+    const params: Record<string, string> = {}
+    if (filters?.status && filters.status !== 'all') params.status = filters.status
+    if (filters?.provider && filters.provider !== 'all') params.provider = filters.provider
+    if (filters?.from) params.from = filters.from
+    if (filters?.to) params.to = `${filters.to}T23:59:59`
+    if (filters?.appId) params.appId = filters.appId
+
+    const response = await client.get('/api/payment', { params: Object.keys(params).length ? params : undefined })
     let txs = parseTransactionListPayload(response.data)
-
-    if (filters?.status && filters.status !== 'all') {
-      txs = txs.filter((t) => t.status.toLowerCase() === filters.status?.toLowerCase())
-    }
-
-    if (filters?.provider && filters.provider !== 'all') {
-      txs = txs.filter((t) => t.provider.toLowerCase() === filters.provider?.toLowerCase())
-    }
 
     if (filters?.merchantId && filters.merchantId !== 'all') {
       txs = txs.filter((t) => t.merchantId === filters.merchantId)
@@ -480,6 +496,67 @@ export const analyticsApi = {
   async dxSummary(days = 14) {
     const response = await client.get(`/api/analytics/dx-summary?days=${days}`)
     return response.data as DxAnalyticsSummaryDto
+  },
+}
+
+export interface MerchantApp {
+  id: string
+  name: string
+  description?: string
+  mode: 'test' | 'live'
+  keyStatus: string
+  keyPrefix: string
+  lastUsedAt?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface CreateAppResult {
+  id: string
+  name: string
+  description?: string
+  mode: string
+  apiKey: string   // shown only once at creation
+  createdAt?: string
+}
+
+export interface RotateAppResult {
+  id: string
+  apiKey: string   // shown only once after rotation
+  mode: string
+  rotatedAt?: string
+}
+
+export const appsApi = {
+  async list(): Promise<MerchantApp[]> {
+    const response = await client.get('/api/apps')
+    const data = response.data as { apps?: Array<Record<string, unknown>> }
+    if (!Array.isArray(data?.apps)) return []
+    return data.apps.map((a) => ({
+      id:          String(a.id || ''),
+      name:        String(a.name || ''),
+      description: typeof a.description === 'string' ? a.description : undefined,
+      mode:        (String(a.mode || 'test') as 'test' | 'live'),
+      keyStatus:   String(a.keyStatus || 'Active'),
+      keyPrefix:   String(a.keyPrefix || ''),
+      lastUsedAt:  typeof a.lastUsedAt === 'string' ? a.lastUsedAt : undefined,
+      createdAt:   typeof a.createdAt  === 'string' ? a.createdAt  : undefined,
+      updatedAt:   typeof a.updatedAt  === 'string' ? a.updatedAt  : undefined,
+    }))
+  },
+
+  async create(input: { name: string; description?: string; isTestMode: boolean }): Promise<CreateAppResult> {
+    const response = await client.post('/api/apps', input)
+    return response.data as CreateAppResult
+  },
+
+  async revoke(appId: string): Promise<void> {
+    await client.delete(`/api/apps/${appId}`)
+  },
+
+  async rotate(appId: string, isTestMode: boolean): Promise<RotateAppResult> {
+    const response = await client.post(`/api/apps/${appId}/rotate?isTestMode=${isTestMode}`)
+    return response.data as RotateAppResult
   },
 }
 
@@ -596,10 +673,24 @@ export const healthApi = {
 }
 
 export const escrowApi = {
-  async list(merchantId?: string, status?: string) {
-    const response = await client.get('/api/escrow', {
-      params: { merchantId, status },
-    })
+  async list(merchantId?: string, status?: string, appId?: string) {
+    const params: Record<string, string> = {}
+    if (merchantId) params.merchantId = merchantId
+    if (status) params.status = status
+    if (appId) params.appId = appId
+    const response = await client.get('/api/escrow', { params: Object.keys(params).length ? params : undefined })
+    return response.data
+  },
+
+  async simulate(data: {
+    amount: number
+    currency: string
+    customerPhone: string
+    description?: string
+    releaseMode: string
+    autoTimeoutDays?: number
+  }) {
+    const response = await client.post('/api/escrow/simulate', data)
     return response.data
   },
 
@@ -632,6 +723,19 @@ export const escrowApi = {
     const response = await client.post(`/api/escrow/${id}/dispute`, { reason })
     return response.data
   },
+}
+
+export interface MerchantBalance {
+  availableBalance: number
+  pendingBalance: number
+  reservedBalance: number
+  currency: string
+  lastUpdated: string | null
+}
+
+export const balanceApi = {
+  get: (): Promise<MerchantBalance> =>
+    client.get<MerchantBalance>('/api/merchant/balance').then((r) => r.data),
 }
 
 export const adminConfigApi = {

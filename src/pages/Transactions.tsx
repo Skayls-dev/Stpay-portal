@@ -4,10 +4,10 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { useAuth } from '../hooks/useAuth'
-import { transactionsApi, POLL_INTERVAL_TRANSACTIONS } from '../lib/api/modules'
+import { transactionsApi, appsApi, POLL_INTERVAL_TRANSACTIONS } from '../lib/api/modules'
 import { Badge, Input, Select, Button } from '../components/ui'
 import { IconClose, IconCopy } from '../components/icons/NavIcons'
-import type { Transaction } from '../lib/api/modules'
+import type { Transaction, MerchantApp } from '../lib/api/modules'
 
 const PROVIDERS = ['all','MTN','ORANGE']
 const STATUSES  = ['all','pending','processing','completed','failed','cancelled']
@@ -209,7 +209,7 @@ function DetailPanel({
 function SkeletonRow() {
   return (
     <tr className="border-t border-[var(--border-soft)]">
-      {[28,120,90,70,80,60].map((w,i) => (
+      {[28,120,110,90,70,80,60].map((w,i) => (
         <td key={i} className="px-4 py-3">
           <div className="h-3 rounded animate-pulse bg-[var(--border)]" style={{width:w}}/>
         </td>
@@ -224,9 +224,19 @@ export default function Transactions() {
   const [statusFilter, setStatusFilter]   = useState('all')
   const [providerFilter, setProviderFilter] = useState('all')
   const [merchantFilter, setMerchantFilter] = useState('')
+  const [appFilter, setAppFilter]         = useState('')
   const [search, setSearch] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo]     = useState('')
+  const [escrowOnly, setEscrowOnly] = useState(false)
   const [selected, setSelected] = useState<Transaction|null>(null)
-  const isFiltered = statusFilter!=='all'||providerFilter!=='all'||!!merchantFilter||!!search
+  const isFiltered = statusFilter!=='all'||providerFilter!=='all'||!!merchantFilter||!!search||!!dateFrom||!!dateTo||escrowOnly||!!appFilter
+
+  const { data: apps = [] } = useQuery<MerchantApp[]>({
+    queryKey: ['merchant-apps'],
+    queryFn: () => appsApi.list(),
+    enabled: !isSuperAdmin,
+  })
 
   const pushMutation = useMutation({
     mutationFn: (transactionId: string) => transactionsApi.pushPayment(transactionId),
@@ -250,23 +260,35 @@ export default function Transactions() {
   }
 
   const { data: txs=[], isFetching, isLoading } = useQuery({
-    queryKey: ['transactions', statusFilter, providerFilter, merchantFilter],
+    queryKey: ['transactions', statusFilter, providerFilter, merchantFilter, dateFrom, dateTo, appFilter],
     queryFn: () => transactionsApi.list({
       status:     statusFilter   !== 'all' ? statusFilter   : undefined,
       provider:   providerFilter !== 'all' ? providerFilter : undefined,
       merchantId: merchantFilter || undefined,
+      from:       dateFrom || undefined,
+      to:         dateTo   || undefined,
+      appId:      appFilter || undefined,
     }),
     refetchInterval: POLL_INTERVAL_TRANSACTIONS,
   })
 
-  const filtered = search.trim()
-    ? txs.filter(tx => {
-        const q = search.toLowerCase()
-        return (tx.transactionId||'').toLowerCase().includes(q) ||
-               (tx.id||'').toLowerCase().includes(q) ||
-               (tx.merchantName||'').toLowerCase().includes(q)
-      })
-    : txs
+  const filtered = (() => {
+    let result = txs
+    if (search.trim()) {
+      const q = search.toLowerCase().trim()
+      const isNum = /^\d/.test(q)
+      result = result.filter(tx =>
+        (tx.transactionId||'').toLowerCase().includes(q) ||
+        (tx.id||'').toLowerCase().includes(q) ||
+        (tx.merchantName||'').toLowerCase().includes(q) ||
+        (tx.customerPhone||'').includes(q) ||
+        (tx.customerName||'').toLowerCase().includes(q) ||
+        (isNum && String(Math.round(tx.amount)).includes(q))
+      )
+    }
+    if (escrowOnly) result = result.filter(tx => !!tx.escrow?.escrowId)
+    return result
+  })()
 
   return (
     <div className="flex flex-col gap-4 h-full">
@@ -291,7 +313,7 @@ export default function Transactions() {
             <circle cx="5" cy="5" r="3.5" stroke="currentColor" strokeWidth="1.3"/>
             <path d="M8 8l2 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
           </svg>
-          <Input className="pl-8 h-8 text-[12px]" placeholder="Rechercher un ID, marchand…"
+          <Input className="pl-8 h-8 text-[12px]" placeholder="ID, téléphone, nom, montant…"
                  value={search} onChange={(e) => setSearch(e.target.value)}/>
         </div>
         <Select className="w-40 h-8 text-[12px]" value={statusFilter}
@@ -308,12 +330,46 @@ export default function Transactions() {
             <option key={p} value={p}>{p==='all'?'Tous les opérateurs':p}</option>
           ))}
         </Select>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-[var(--text-4)] whitespace-nowrap">Du</span>
+          <Input type="date" className="h-8 text-[12px] w-36"
+                 value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}/>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] text-[var(--text-4)] whitespace-nowrap">Au</span>
+          <Input type="date" className="h-8 text-[12px] w-36"
+                 value={dateTo} onChange={(e) => setDateTo(e.target.value)}/>
+        </div>
         {isSuperAdmin && (
           <Input className="w-44 h-8 text-[12px]" placeholder="ID marchand…"
                  value={merchantFilter} onChange={(e) => setMerchantFilter(e.target.value)}/>
         )}
+        {!isSuperAdmin && apps.length > 0 && (
+          <Select className="w-44 h-8 text-[12px]" value={appFilter}
+                  onChange={(e) => setAppFilter(e.target.value)}>
+            <option value="">Toutes les apps</option>
+            {apps.map(a => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </Select>
+        )}
+        <button
+          type="button"
+          onClick={() => setEscrowOnly(v => !v)}
+          className={`h-8 px-3 rounded-[6px] text-[11px] font-semibold flex items-center gap-1.5 border transition-colors ${
+            escrowOnly
+              ? 'bg-emerald-500/10 text-emerald-700 border-emerald-300/60 hover:bg-emerald-500/20'
+              : 'bg-white text-[var(--text-3)] border-[var(--border)] hover:bg-[var(--bg-subtle)]'
+          }`}
+        >
+          <svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
+            <path d="M5.5 7V5.8a2.5 2.5 0 115 0V7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+          </svg>
+          Escrow
+        </button>
         {isFiltered && (
-          <button onClick={() => { setStatusFilter('all'); setProviderFilter('all'); setMerchantFilter(''); setSearch('') }}
+          <button onClick={() => { setStatusFilter('all'); setProviderFilter('all'); setMerchantFilter(''); setSearch(''); setDateFrom(''); setDateTo(''); setEscrowOnly(false); setAppFilter('') }}
                   className="h-8 px-3 rounded-[6px] text-[11px] font-semibold flex items-center gap-1.5
                              bg-[var(--red-bg)] text-[var(--red)] border border-[var(--red-border)]
                              hover:bg-red-100 transition-colors">
@@ -332,7 +388,7 @@ export default function Transactions() {
             <thead className="sticky top-0 z-10 bg-[var(--bg-subtle)]">
               <tr>
                 <th className="px-4 py-2.5 w-10"/>
-                {['Référence','Montant','Statut', ...(isSuperAdmin?['Marchand']:[]), 'Date'].map((h,i) => (
+                {['Référence','Client','Montant','Statut', ...(isSuperAdmin?['Marchand']:[]), 'Date'].map((h,i) => (
                   <th key={h} className={`px-4 py-2.5 text-[10px] font-semibold uppercase
                                           tracking-wider text-[var(--text-4)]
                                           ${i>=1&&i<=2?'text-right':''}
@@ -347,7 +403,7 @@ export default function Transactions() {
                 ? Array.from({length:8}).map((_,i) => <SkeletonRow key={i}/>)
                 : filtered.length === 0
                 ? (
-                  <tr><td colSpan={isSuperAdmin?6:5}>
+                  <tr><td colSpan={isSuperAdmin?7:6}>
                     <div className="flex flex-col items-center justify-center py-14 text-center">
                       <div className="w-11 h-11 rounded-full bg-[var(--bg-hover)]
                                       flex items-center justify-center mb-3">
@@ -373,9 +429,24 @@ export default function Transactions() {
                                     : 'hover:bg-[var(--bg-subtle)]'}`}>
                     <td className="px-4 py-3 w-10"><ProvBadge name={tx.provider}/></td>
                     <td className="px-4 py-3">
-                      <span className="font-mono text-[11px] text-[var(--text-2)]">
-                        {transactionsApi.displayReference(tx)}
-                      </span>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-mono text-[11px] text-[var(--text-2)]">
+                          {transactionsApi.displayReference(tx)}
+                        </span>
+                        {tx.applicationName && (
+                          <span className="text-[10px] text-[var(--text-4)] bg-[var(--bg-hover)] rounded px-1.5 py-0.5 w-fit">
+                            {tx.applicationName}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[11px] font-mono text-[var(--text-2)]">{tx.customerPhone||'—'}</span>
+                        {tx.customerName && (
+                          <span className="text-[10px] text-[var(--text-4)] truncate max-w-[130px]">{tx.customerName}</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className="font-mono text-[12px] font-bold text-[var(--text-1)]">

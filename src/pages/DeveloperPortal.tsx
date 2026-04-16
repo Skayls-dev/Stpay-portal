@@ -12,8 +12,11 @@ import {
   isFailedPaymentStatus,
   isSuccessfulPaymentStatus,
   merchantsApi,
+  appsApi,
   normalizePaymentStatus,
   providersHealthApi,
+  type MerchantApp,
+  type CreateAppResult,
 } from '../lib/api/modules'
 import { Badge } from '../components/ui'
 import client, { type ApiClientError } from '../lib/api/client'
@@ -919,112 +922,213 @@ function KeysTab() {
   const { user } = useAuth()
   const dxActor = { userId: user.id, userName: user.name, role: user.role, merchantId: user.merchantId }
   const qc = useQueryClient()
-  const { data: keys = [], isLoading } = useQuery({ queryKey: ['dev-keys'], queryFn: merchantsApi.list })
-  const [revealed, setRevealed] = useState<Set<string>>(new Set())
-  const [newKey, setNewKey] = useState<string | null>(null)
-  const [genMode, setGenMode] = useState<'test' | 'live'>('test')
 
-  const generate = useMutation({
-    mutationFn: () => merchantsApi.create({ isTestMode: genMode === 'test' }),
-    onSuccess: (data) => {
+  // ── Create form state ──
+  const [appName, setAppName]       = useState('')
+  const [appDesc, setAppDesc]       = useState('')
+  const [appMode, setAppMode]       = useState<'test' | 'live'>('test')
+  const [formOpen, setFormOpen]     = useState(false)
+
+  // ── Revealed-key state (newKey after create/rotate) ──
+  const [flashKey, setFlashKey]     = useState<{ appId: string; key: string; label: string } | null>(null)
+
+  // ── Rotate confirm ──
+  const [rotatingId, setRotatingId] = useState<string | null>(null)
+
+  const { data: apps = [], isLoading } = useQuery({
+    queryKey: ['merchant-apps'],
+    queryFn: appsApi.list,
+  })
+
+  const createApp = useMutation({
+    mutationFn: () => appsApi.create({ name: appName.trim(), description: appDesc.trim() || undefined, isTestMode: appMode === 'test' }),
+    onSuccess: (data: CreateAppResult) => {
       markDxStep('api_key_generated', dxActor)
-      setNewKey(data.apiKey)
-      qc.invalidateQueries({ queryKey: ['dev-keys'] })
-      toast.success('Nouvelle clé générée !')
+      setFlashKey({ appId: data.id, key: data.apiKey, label: data.name })
+      qc.invalidateQueries({ queryKey: ['merchant-apps'] })
+      setAppName(''); setAppDesc(''); setFormOpen(false)
+      toast.success(`Application « ${data.name} » créée !`)
     },
     onError: (e: Error) => toast.error(e.message),
   })
 
-  const revoke = useMutation({
-    mutationFn: (key: string) => merchantsApi.revokeKey(key),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['dev-keys'] }); toast.success('Clé révoquée') },
+  const revokeApp = useMutation({
+    mutationFn: (id: string) => appsApi.revoke(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['merchant-apps'] }); toast.success('Application supprimée') },
     onError: (e: Error) => toast.error(e.message),
   })
 
-  const toggleReveal = (k: string) => setRevealed((prev) => { const s = new Set(prev); s.has(k) ? s.delete(k) : s.add(k); return s })
-  const copy = (text: string) => { navigator.clipboard.writeText(text); toast.success('Copié !') }
+  const rotateApp = useMutation({
+    mutationFn: ({ id, isTestMode }: { id: string; isTestMode: boolean }) => appsApi.rotate(id, isTestMode),
+    onSuccess: (data, vars) => {
+      const app = apps.find((a: MerchantApp) => a.id === vars.id)
+      setFlashKey({ appId: data.id, key: data.apiKey, label: app?.name ?? 'Application' })
+      qc.invalidateQueries({ queryKey: ['merchant-apps'] })
+      setRotatingId(null)
+      toast.success('Clé renouvelée — copiez-la maintenant')
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
 
-  const liveKeys = (keys as ApiKey[]).filter((k) => k.mode === 'live')
-  const testKeysAll = (keys as ApiKey[]).filter((k) => k.mode === 'test')
-  const sandboxBannerKey = !isLoading && liveKeys.length === 0 && testKeysAll.length > 0 ? testKeysAll[0] : null
+  const copy = (text: string) => { navigator.clipboard.writeText(text); toast.success('Copié !') }
 
   return (
     <div className="space-y-5">
-      <SectionHeader title="Gestion des clés API" sub="Toutes les requêtes doivent inclure votre clé dans le header X-Api-Key" />
+      <SectionHeader
+        title="Mes applications"
+        sub="Chaque application possède sa propre clé API. Vous pouvez créer autant d'applications que nécessaire sans créer un nouveau compte."
+      />
 
-      {sandboxBannerKey && (
-        <div className="p-4 rounded-[var(--r-md)] border border-[var(--amber-border)] bg-[var(--amber-bg)]">
-          <p className="text-[12px] font-bold text-[var(--amber)] mb-2">Mode Sandbox — Vous n'avez pas encore de clé live</p>
-          <div className="flex items-center gap-2 flex-wrap">
-            <code className="flex-1 text-[11px] font-mono text-[var(--text-1)] bg-white px-2 py-1.5 rounded border border-[var(--amber-border)] break-all">{sandboxBannerKey.key}</code>
-            <button className="btn-secondary text-[11px] flex-shrink-0" onClick={() => copy(sandboxBannerKey.key)}>Copier</button>
+      {/* ── Flash: newly generated key ── */}
+      {flashKey && (
+        <div className="p-4 rounded-[var(--r-md)] border border-[var(--green-border)] bg-[var(--green-bg)]">
+          <p className="text-[12px] font-bold text-[var(--green)] mb-1">
+            Clé de « {flashKey.label} » — copiez-la maintenant, elle ne sera plus affichée en clair.
+          </p>
+          <div className="flex items-center gap-2 mt-2">
+            <code className="flex-1 text-[11px] font-mono bg-white px-3 py-2 rounded-[5px] border border-[var(--green-border)] break-all text-[var(--text-1)]">
+              {flashKey.key}
+            </code>
+            <button className="btn-secondary text-[11px] flex-shrink-0" onClick={() => copy(flashKey.key)}>Copier</button>
+            <button className="btn-ghost text-[11px] flex-shrink-0" onClick={() => setFlashKey(null)}>✕</button>
           </div>
         </div>
       )}
 
+      {/* ── Create application ── */}
       <div className="panel">
-        <div className="panel-header"><span className="panel-title">Générer une clé</span></div>
-        <div className="p-4 flex flex-wrap items-center gap-3">
-          <div className="flex gap-1 bg-[var(--border)] p-[3px] rounded-[7px]">
-            {(['test', 'live'] as const).map((m) => (
-              <button key={m} onClick={() => setGenMode(m)}
-                      className={`px-4 py-1.5 rounded-[5px] text-[12px] font-semibold transition-colors ${genMode === m ? 'bg-white text-[var(--text-1)] shadow-sm' : 'text-[var(--text-2)] hover:text-[var(--text-1)]'}`}>
-                {m === 'test' ? 'Test  sk_test_…' : 'Live  sk_live_…'}
-              </button>
-            ))}
-          </div>
-          <button className="btn-primary" onClick={() => generate.mutate()} disabled={generate.isPending}>
-            {generate.isPending ? 'Génération…' : '+ Nouvelle clé'}
+        <div className="panel-header">
+          <span className="panel-title">Nouvelle application</span>
+          <button className="btn-ghost text-[11px]" onClick={() => setFormOpen((v) => !v)}>
+            {formOpen ? 'Annuler' : '+ Créer'}
           </button>
         </div>
-        {newKey && (
-          <div className="mx-4 mb-4 p-3 rounded-[var(--r-sm)] bg-[var(--green-bg)] border border-[var(--green-border)]">
-            <p className="text-[11px] font-semibold text-[var(--green)] mb-2">Clé générée — copiez-la maintenant, elle ne sera plus affichée en clair.</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 text-[11px] font-mono text-[var(--text-1)] bg-white px-3 py-2 rounded-[5px] border border-[var(--green-border)] break-all">{newKey}</code>
-              <button className="btn-secondary text-[11px]" onClick={() => copy(newKey)}>Copier</button>
-              <button className="btn-ghost text-[11px]" onClick={() => setNewKey(null)}>✕</button>
+        {formOpen && (
+          <div className="p-4 space-y-3 border-t border-[var(--border-soft)]">
+            <div className="space-y-1">
+              <label className="block text-[11px] font-semibold text-[var(--text-2)]">Nom de l'application *</label>
+              <input
+                className="w-full px-3 py-2 rounded-[6px] border border-[var(--border)] bg-[var(--bg-raised)] text-[12px] text-[var(--text-1)] focus:outline-none focus:ring-1 focus:ring-[var(--orange)]"
+                placeholder="Ex : Site e-commerce, Application mobile, POS Yaoundé…"
+                value={appName}
+                onChange={(e) => setAppName(e.target.value)}
+                maxLength={120}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="block text-[11px] font-semibold text-[var(--text-2)]">Description (optionnel)</label>
+              <input
+                className="w-full px-3 py-2 rounded-[6px] border border-[var(--border)] bg-[var(--bg-raised)] text-[12px] text-[var(--text-1)] focus:outline-none focus:ring-1 focus:ring-[var(--orange)]"
+                placeholder="Usage, environnement, canal…"
+                value={appDesc}
+                onChange={(e) => setAppDesc(e.target.value)}
+                maxLength={500}
+              />
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex gap-1 bg-[var(--border)] p-[3px] rounded-[7px]">
+                {(['test', 'live'] as const).map((m) => (
+                  <button key={m} onClick={() => setAppMode(m)}
+                          className={`px-4 py-1.5 rounded-[5px] text-[12px] font-semibold transition-colors ${appMode === m ? 'bg-white text-[var(--text-1)] shadow-sm' : 'text-[var(--text-2)] hover:text-[var(--text-1)]'}`}>
+                    {m === 'test' ? 'Test  sk_test_…' : 'Live  sk_live_…'}
+                  </button>
+                ))}
+              </div>
+              <button
+                className="btn-primary"
+                disabled={createApp.isPending || !appName.trim()}
+                onClick={() => createApp.mutate()}
+              >
+                {createApp.isPending ? 'Création…' : 'Créer l\'application'}
+              </button>
             </div>
           </div>
         )}
       </div>
 
+      {/* ── Applications list ── */}
       <div className="panel">
         <div className="panel-header">
-          <span className="panel-title">Clés actives</span>
-          <span className="text-[11px] text-[var(--text-3)]">{keys.length} clé{keys.length !== 1 ? 's' : ''}</span>
+          <span className="panel-title">Applications enregistrées</span>
+          <span className="text-[11px] text-[var(--text-3)]">{apps.length} application{apps.length !== 1 ? 's' : ''}</span>
         </div>
         {isLoading ? (
-          <div className="p-4 space-y-2">{[1,2].map(i => <div key={i} className="h-12 rounded animate-pulse bg-[var(--border)]"/>)}</div>
-        ) : keys.length === 0 ? (
-          <p className="p-6 text-center text-[13px] text-[var(--text-3)]">Aucune clé active</p>
+          <div className="p-4 space-y-2">{[1,2].map(i => <div key={i} className="h-16 rounded animate-pulse bg-[var(--border)]"/>)}</div>
+        ) : (apps as MerchantApp[]).length === 0 ? (
+          <div className="p-8 text-center">
+            <p className="text-[13px] text-[var(--text-3)]">Aucune application enregistrée</p>
+            <p className="text-[11px] text-[var(--text-4)] mt-1">Créez votre première application pour obtenir une clé API.</p>
+          </div>
         ) : (
           <div className="divide-y divide-[var(--border-soft)]">
-            {keys.map((k: ApiKey) => (
-              <div key={k.key} className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--bg-subtle)]">
-                <Badge color={k.mode === 'live' ? 'emerald' : 'amber'}>{k.mode.toUpperCase()}</Badge>
-                <code className="flex-1 text-[11px] font-mono text-[var(--text-2)] truncate">{revealed.has(k.key) ? k.key : maskKey(k.key)}</code>
-                <span className="text-[11px] text-[var(--text-4)]">{fmtDate(k.createdAt)}</span>
-                <button className="btn-ghost text-[11px] py-1" onClick={() => toggleReveal(k.key)}>{revealed.has(k.key) ? 'Masquer' : 'Afficher'}</button>
-                <button className="btn-secondary text-[11px] py-1" onClick={() => copy(k.key)}>Copier</button>
-                <button className="btn-danger text-[11px] py-1" disabled={revoke.isPending}
-                        onClick={() => { if (confirm('Révoquer cette clé ? Action irréversible.')) revoke.mutate(k.key) }}>
-                  Révoquer
-                </button>
+            {(apps as MerchantApp[]).map((app) => (
+              <div key={app.id} className="px-4 py-3 hover:bg-[var(--bg-subtle)] transition-colors">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[13px] font-semibold text-[var(--text-1)] truncate">{app.name}</span>
+                      <Badge color={app.mode === 'live' ? 'emerald' : 'amber'}>{app.mode.toUpperCase()}</Badge>
+                      {app.keyStatus === 'Revoked' && <Badge color="red">Révoquée</Badge>}
+                    </div>
+                    {app.description && (
+                      <p className="text-[11px] text-[var(--text-3)] mt-0.5">{app.description}</p>
+                    )}
+                    <div className="flex items-center gap-3 mt-1.5">
+                      <code className="text-[11px] font-mono text-[var(--text-2)]">{app.keyPrefix}</code>
+                      <span className="text-[10px] text-[var(--text-4)]">
+                        Créée {app.createdAt ? new Date(app.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                      </span>
+                      {app.lastUsedAt && (
+                        <span className="text-[10px] text-[var(--text-4)]">
+                          · Utilisée {new Date(app.lastUsedAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {/* Rotate */}
+                    {rotatingId === app.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-[var(--amber)]">Confirmer la rotation ?</span>
+                        <button
+                          className="btn-primary text-[11px] py-1"
+                          onClick={() => rotateApp.mutate({ id: app.id, isTestMode: app.mode === 'test' })}
+                          disabled={rotateApp.isPending}
+                        >
+                          {rotateApp.isPending ? '…' : 'Oui'}
+                        </button>
+                        <button className="btn-ghost text-[11px] py-1" onClick={() => setRotatingId(null)}>Non</button>
+                      </div>
+                    ) : (
+                      <button className="btn-secondary text-[11px] py-1" onClick={() => setRotatingId(app.id)}>
+                        Rotation
+                      </button>
+                    )}
+                    {/* Revoke */}
+                    <button
+                      className="btn-danger text-[11px] py-1"
+                      disabled={revokeApp.isPending}
+                      onClick={() => { if (confirm(`Supprimer l'application « ${app.name} » ? Les intégrations utilisant cette clé cesseront de fonctionner.`)) revokeApp.mutate(app.id) }}
+                    >
+                      Supprimer
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
 
+      {/* ── Best practices ── */}
       <div className="panel">
         <div className="panel-header"><span className="panel-title">Bonnes pratiques</span></div>
         <div className="p-4 grid sm:grid-cols-2 gap-3">
           {[
-            { icon: '🔒', title: 'Ne jamais exposer vos clés', desc: "Ne commitez pas vos clés dans Git. Utilisez des variables d'environnement." },
-            { icon: '🧪', title: 'Test vs Live', desc: 'Utilisez sk_test_ en développement. sk_live_ uniquement en production.' },
-            { icon: '🔄', title: 'Rotation régulière', desc: 'Faites une rotation de vos clés tous les 90 jours ou en cas de compromission.' },
-            { icon: '📋', title: 'Header X-Api-Key', desc: 'Chaque requête doit inclure : X-Api-Key: sk_test_votre_clé' },
+            { icon: '📦', title: 'Une app = une clé', desc: "Créez une application distincte par intégration (site web, mobile, POS). Cela vous permet de révoquer sans impact sur les autres." },
+            { icon: '🔒', title: 'Variables d\'environnement', desc: "Ne commitez jamais vos clés dans Git. Stockez-les dans vos variables d'environnement ou un secret manager." },
+            { icon: '🧪', title: 'Test vs Live', desc: 'Utilisez sk_test_ en développement. sk_live_ uniquement en production validée.' },
+            { icon: '🔄', title: 'Rotation régulière', desc: 'Faites une rotation tous les 90 jours, ou immédiatement en cas de compromission.' },
           ].map(({ icon, title, desc }) => (
             <div key={title} className="flex gap-3 p-3 bg-[var(--bg-subtle)] rounded-[var(--r-sm)] border border-[var(--border-soft)]">
               <span className="text-[18px] flex-shrink-0">{icon}</span>
@@ -1097,7 +1201,7 @@ function PlaygroundTab({ goToTab }: { goToTab: (tab: Tab) => void }) {
   }
 
   const buildUrl = () => {
-    const base = import.meta.env.VITE_API_BASE || 'http://localhost:5169'
+    const base = import.meta.env.VITE_API_BASE ?? ''
     let path = selectedEndpoint.path
     Object.entries(params).forEach(([k, v]) => { path = path.replace(`{${k}}`, v || `{${k}}`) })
     return base + path

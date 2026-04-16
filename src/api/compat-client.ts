@@ -13,7 +13,7 @@ import {
 } from './sdk.gen';
 import type { ApiError, PaymentRequest, RefundRequest } from './types';
 
-const DEFAULT_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5169';
+const DEFAULT_BASE_URL = import.meta.env.VITE_API_URL ?? '';
 const DEFAULT_API_KEY = import.meta.env.VITE_API_KEY || '';
 const API_KEY_STORAGE_KEY = 'st-pay-api-key';
 

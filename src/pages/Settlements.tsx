@@ -7,6 +7,7 @@ import { Badge, Button, Card, Input, Select } from '../components/ui'
 import {
   merchantsApi,
   settlementsApi,
+  balanceApi,
   type SettlementItem,
   type SettlementTransactionItem,
 } from '../lib/api/modules'
@@ -80,6 +81,13 @@ export default function Settlements() {
   const settlementsKey = isSuperAdmin
     ? ['settlements', 'all', page, pageSize]
     : ['settlements', 'mine']
+
+  const { data: merchantBalance } = useQuery({
+    queryKey: ['merchant-balance'],
+    queryFn: balanceApi.get,
+    staleTime: 60_000,
+    enabled: !isSuperAdmin,
+  })
 
   const settlementsQuery = useQuery({
     queryKey: settlementsKey,
@@ -201,6 +209,15 @@ export default function Settlements() {
 
   return (
     <div className="space-y-4">
+      {!isSuperAdmin && merchantBalance && merchantBalance.reservedBalance > 0 && (
+        <div className="rounded-[8px] border border-[var(--amber-border)] bg-[var(--amber-bg)] px-3 py-2.5 text-[11px]">
+          <span className="font-semibold text-[var(--amber-dark)]">
+            {new Intl.NumberFormat('fr-FR').format(merchantBalance.reservedBalance)} XAF
+          </span>
+          {' '}sont actuellement séquestrés (escrow actif) et exclus du virement.
+          Ces fonds seront disponibles après confirmation de livraison.
+        </div>
+      )}
       {isSuperAdmin && (
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>

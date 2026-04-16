@@ -45,7 +45,7 @@ const STORAGE_EVENT = 'stpay-dx-analytics-updated'
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7
 const SESSION_LIMIT = 100
 const DX_SYNC_ENABLED = import.meta.env.VITE_ENABLE_DX_EVENT_SYNC !== 'false'
-const DX_SYNC_ENDPOINT = import.meta.env.VITE_DX_ANALYTICS_ENDPOINT || `${import.meta.env.VITE_API_BASE || 'http://localhost:5169'}/api/analytics/dx-events`
+const DX_SYNC_ENDPOINT = import.meta.env.VITE_DX_ANALYTICS_ENDPOINT || `${import.meta.env.VITE_API_BASE ?? ''}/api/analytics/dx-events`
 
 const STEP_ORDER: DxStep[] = [
   'portal_opened',
