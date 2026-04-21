@@ -18,6 +18,7 @@ interface WebhookItem {
   nextRetryAt?: string | null
   lastError?: string | null
   lastHttpStatusCode?: number | null
+  payload?: string | null
 }
 
 interface WebhookListResponse {
@@ -207,6 +208,27 @@ function WebhookDetail({ item, onClose, onReplay }:
                   </dd>
                 </div>
               ))}
+
+              {/* Payload inspector */}
+              {item.payload && (
+                <div className="pt-3">
+                  <p className="text-[11px] font-semibold text-[var(--text-muted)] mb-2 flex items-center gap-1.5">
+                    <span>Payload JSON</span>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(item.payload ?? '')}
+                      className="text-[10px] px-1.5 py-0.5 rounded border border-[var(--border-soft)]
+                                 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                    >
+                      copier
+                    </button>
+                  </p>
+                  <pre className="text-[10px] font-mono bg-[var(--bg-page)] border border-[var(--border-soft)]
+                                  rounded-[6px] p-3 overflow-x-auto whitespace-pre-wrap break-all
+                                  text-[var(--text-secondary)] max-h-64 overflow-y-auto">
+                    {(() => { try { return JSON.stringify(JSON.parse(item.payload), null, 2) } catch { return item.payload } })()}
+                  </pre>
+                </div>
+              )}
             </dl>
           )}
         </div>

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 export type UserRole = 'super_admin' | 'merchant'
+export type PortalRole = 'owner' | 'developer' | 'member'
 
 export interface AuthUser {
   id: string
@@ -8,6 +9,7 @@ export interface AuthUser {
   role: UserRole
   merchantId?: string
   permissions: string[]
+  portalRole?: PortalRole  // only for merchant portal users
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
@@ -53,6 +55,45 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   ],
 }
 
+/**
+ * Permissions affinées selon le rôle portail (owner / developer / member).
+ * Seulement utilisées quand role === 'merchant'.
+ */
+export const PORTAL_ROLE_PERMISSIONS: Record<PortalRole, string[]> = {
+  owner: [
+    // Toutes les permissions marchant
+    'merchants.view_own',
+    'merchants.view_own_keys',
+    'settlements.view_own',
+    'transactions.view_own',
+    'transactions.refund_own',
+    'webhooks.view_own',
+    'webhooks.replay_own',
+    'escrow.view_own',
+    'analytics.view_own',
+    'providers.view_health',
+  ],
+  developer: [
+    // Technique : clés API, webhooks, transactions, portail dev
+    'merchants.view_own',
+    'merchants.view_own_keys',
+    'transactions.view_own',
+    'webhooks.view_own',
+    'webhooks.replay_own',
+    'analytics.view_own',
+    'providers.view_health',
+  ],
+  member: [
+    // Opérationnel : transactions, escrow, règlements
+    'merchants.view_own',
+    'transactions.view_own',
+    'transactions.refund_own',
+    'settlements.view_own',
+    'escrow.view_own',
+    'analytics.view_own',
+  ],
+}
+
 const STORAGE = {
   token: 'stpay_token',
   apiKey: 'stpay_api_key',
@@ -60,6 +101,7 @@ const STORAGE = {
   userName: 'stpay_user_name',
   userRole: 'stpay_user_role',
   merchantId: 'stpay_merchant_id',
+  portalRole: 'stpay_portal_role',
 }
 
 function loadFromStorage(): AuthUser | null {
@@ -72,12 +114,19 @@ function loadFromStorage(): AuthUser | null {
     const role: UserRole =
       storedRole === 'merchant' || storedRole === 'super_admin' ? storedRole : 'super_admin'
 
+    const portalRole = (localStorage.getItem(STORAGE.portalRole) as PortalRole) || undefined
+    const permissions =
+      role === 'merchant' && portalRole
+        ? PORTAL_ROLE_PERMISSIONS[portalRole]
+        : ROLE_PERMISSIONS[role]
+
     return {
       id: userId,
       name: localStorage.getItem(STORAGE.userName) || '',
       role,
       merchantId: localStorage.getItem(STORAGE.merchantId) || undefined,
-      permissions: ROLE_PERMISSIONS[role],
+      permissions,
+      portalRole,
     }
   } catch {
     return null
@@ -106,7 +155,20 @@ export const useAuthStore = create<AuthStore>((set) => ({
     } else {
       localStorage.removeItem(STORAGE.merchantId)
     }
-    set({ user: { ...userData, permissions: ROLE_PERMISSIONS[userData.role] } })
+    if (userData.portalRole) {
+      localStorage.setItem(STORAGE.portalRole, userData.portalRole)
+    } else {
+      localStorage.removeItem(STORAGE.portalRole)
+    }
+    set({
+      user: {
+        ...userData,
+        permissions:
+          userData.role === 'merchant' && userData.portalRole
+            ? PORTAL_ROLE_PERMISSIONS[userData.portalRole]
+            : ROLE_PERMISSIONS[userData.role],
+      },
+    })
   },
 
   logout: () => {

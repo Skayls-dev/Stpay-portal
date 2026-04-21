@@ -203,6 +203,8 @@
   /* ── Provider badge colours ── */
   .prov-mtn  { background: var(--mtn-bg); color: var(--mtn-text); }
   .prov-ora  { background: var(--ora-bg); color: var(--ora-text); }
+  .prov-wav  { background: var(--wav-bg); color: var(--wav-text); }
+  .prov-moov { background: #EAFAE8; color: #2A6B25; }
 
   /* ── Input ── */
   .sp-input {

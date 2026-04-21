@@ -19,7 +19,7 @@ export function Card({ children, className, padding = true }:
 }
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
-type BadgeColor = 'emerald' | 'amber' | 'red' | 'slate' | 'blue'
+type BadgeColor = 'emerald' | 'amber' | 'red' | 'slate' | 'blue' | 'violet'
 
 const BADGE: Record<BadgeColor, string> = {
   emerald: 'bg-[var(--green-bg)]  text-[var(--green)]',
@@ -27,6 +27,7 @@ const BADGE: Record<BadgeColor, string> = {
   red:     'bg-[var(--red-bg)]    text-[var(--red)]',
   blue:    'bg-[var(--blue-bg)]   text-[var(--blue)]',
   slate:   'bg-[var(--bg-hover)]  text-[var(--text-2)]',
+  violet:  'bg-violet-100         text-violet-700',
 }
 
 const DOT: Record<BadgeColor, string> = {
@@ -35,6 +36,7 @@ const DOT: Record<BadgeColor, string> = {
   red:     'bg-[var(--red)]',
   blue:    'bg-[var(--blue)]',
   slate:   'bg-[var(--text-3)]',
+  violet:  'bg-violet-500',
 }
 
 export function Badge({ children, color = 'slate', dot = false, className }:

@@ -19,13 +19,18 @@ import Escrow from './pages/Escrow';
 import Settlements from './pages/Settlements';
 import Traceability from './pages/Traceability';
 import MerchantProfile from './pages/MerchantProfile';
+import AcceptInvite from './pages/AcceptInvite';
+import PayoutAccounts from './pages/PayoutAccounts';
 import PortalSelect from './pages/PortalSelect';
 import LandingPage from './pages/LandingPage';
 const DeveloperPortal  = React.lazy(() => import('./pages/DeveloperPortal'));
 const PaymentSimulator = React.lazy(() => import('./pages/PaymentSimulator'));
 const WebshopPublicDemo = React.lazy(() => import('./pages/WebshopPublicDemo'));
-const EscrowDemoPage = React.lazy(() => import('./pages/EscrowDemo'));
-const IntegrationGuides = React.lazy(() => import('./pages/IntegrationGuides'));import AdminConfig from './pages/AdminConfig';
+const IntegrationGuides = React.lazy(() => import('./pages/IntegrationGuides'));
+const GuideVideos       = React.lazy(() => import('./pages/GuideVideos'));
+import AdminConfig from './pages/AdminConfig'
+import KriAlerts from './pages/KriAlerts';
+import Compliance from './pages/Compliance';
 
 function HomeRedirect() {
   const { isAuthenticated, isSuperAdmin } = useAuth();
@@ -69,8 +74,8 @@ function App() {
         <Route path="/merchant/login" element={<Login portal="merchant" />} />
         <Route path="/admin/login"    element={<Login portal="admin" />} />
         <Route path="/register"       element={<MerchantRegister />} />
+        <Route path="/accept-invite"   element={<AcceptInvite />} />
         <Route path="/demo/webshop"   element={<WebshopPublicDemo />} />
-        <Route path="/demo/escrow"    element={<EscrowDemoPage />} />
         <Route path="/" element={<LandingPage />} />
 
         <Route path="/admin" element={<RequireAuth><RequireRole role="super_admin"><DashboardLayout /></RequireRole></RequireAuth>}>
@@ -84,6 +89,9 @@ function App() {
           <Route path="settlements"  element={<RequirePermission permission={['settlements.view_all','settlements.view_own']}><Settlements /></RequirePermission>} />
           <Route path="traceability" element={<RequirePermission permission="settlements.view_all"><Traceability /></RequirePermission>} />
           <Route path="config"       element={<RequirePermission permission="fees.configure"><AdminConfig /></RequirePermission>} />
+          <Route path="kri"          element={<KriAlerts />} />
+          <Route path="compliance"   element={<Compliance />} />
+          <Route path="guide-videos" element={<GuideVideos />} />
         </Route>
 
         <Route path="/merchant" element={<RequireAuth><RequireRole role="merchant"><DashboardLayout /></RequireRole></RequireAuth>}>
@@ -95,9 +103,10 @@ function App() {
           <Route path="escrow"       element={<RequirePermission permission={['escrow.view_own','escrow.release_manual']}><Escrow /></RequirePermission>} />
           <Route path="settlements"  element={<RequirePermission permission={['settlements.view_all','settlements.view_own']}><Settlements /></RequirePermission>} />
           <Route path="profile"      element={<RequirePermission permission="merchants.view_own"><MerchantProfile /></RequirePermission>} />
+          <Route path="payout-accounts" element={<RequirePermission permission="merchants.view_own"><PayoutAccounts /></RequirePermission>} />
           <Route path="developer"    element={<RequirePermission permission="merchants.view_own_keys"><DeveloperPortal /></RequirePermission>} />
           <Route path="simulator"    element={<RequirePermission permission="merchants.view_own_keys"><PaymentSimulator /></RequirePermission>} />
-          <Route path="guides"       element={<RequirePermission permission="merchants.view_own"><IntegrationGuides /></RequirePermission>} />
+          <Route path="guides"       element={<RequirePermission permission="merchants.view_own_keys"><IntegrationGuides /></RequirePermission>} />
 
         </Route>
 

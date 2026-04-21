@@ -26,6 +26,45 @@ export default function Login({ portal = 'merchant' }: LoginProps) {
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>()
   const isAdmin = portal === 'admin'
 
+  // Multi-account state
+  const [pendingAccounts, setPendingAccounts] = useState<{ merchantId: string; merchantName: string }[] | null>(null)
+  const [pendingCredentials, setPendingCredentials] = useState<LoginForm | null>(null)
+  const [selectLoading, setSelectLoading] = useState(false)
+
+  const finalizeLogin = async (res: Awaited<ReturnType<typeof authApi.login>>) => {
+    login(res.user, res.token, res.apiKey)
+
+    if (res.user.role === 'merchant' && !res.apiKey) {
+      try {
+        const keysResponse = await client.get('/api/keys')
+        const keys = Array.isArray(keysResponse.data?.keys) ? keysResponse.data.keys : []
+        const firstKey = keys[0]?.key
+        if (typeof firstKey === 'string' && firstKey.trim()) {
+          localStorage.setItem('stpay_api_key', firstKey)
+        }
+      } catch {
+        // Non-blocking
+      }
+    }
+
+    const home = res.user.role === 'super_admin' ? '/admin' : '/merchant'
+    const isLogin = ['/login', '/admin/login', '/merchant/login'].includes(from)
+    navigate(!from || from === '/' || isLogin ? home : from, { replace: true })
+  }
+
+  const onSelectAccount = async (merchantId: string) => {
+    if (!pendingCredentials) return
+    setSelectLoading(true)
+    try {
+      const res = await authApi.loginSelect(pendingCredentials, merchantId)
+      await finalizeLogin(res)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Connexion impossible')
+    } finally {
+      setSelectLoading(false)
+    }
+  }
+
   const onSubmit = async (data: LoginForm) => {
     setLoading(true)
     try {
@@ -44,27 +83,66 @@ export default function Login({ portal = 'merchant' }: LoginProps) {
         return
       }
 
-      login(res.user, res.token, res.apiKey)
-
-      if (res.user.role === 'merchant' && !res.apiKey) {
-        try {
-          const keysResponse = await client.get('/api/keys')
-          const keys = Array.isArray(keysResponse.data?.keys) ? keysResponse.data.keys : []
-          const firstKey = keys[0]?.key
-          if (typeof firstKey === 'string' && firstKey.trim()) {
-            localStorage.setItem('stpay_api_key', firstKey)
-          }
-        } catch {
-          // Non-blocking: merchant can still navigate, and key can be configured later.
-        }
+      if (res.ambiguous && res.accounts && res.accounts.length > 1) {
+        setPendingCredentials(data)
+        setPendingAccounts(res.accounts)
+        return
       }
 
-      const home = res.user.role === 'super_admin' ? '/admin' : '/merchant'
-      const isLogin = ['/login','/admin/login','/merchant/login'].includes(from)
-      navigate(!from || from === '/' || isLogin ? home : from, { replace: true })
+      await finalizeLogin(res)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Connexion impossible')
     } finally { setLoading(false) }
+  }
+
+  // Account picker screen
+  if (pendingAccounts) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--bg-page)] px-4">
+        <div className="w-full max-w-sm bg-white border border-[var(--border-med)]
+                        rounded-[var(--r-lg)] p-8 shadow-sm">
+          <div className="mb-6 text-center">
+            <div className="mx-auto mb-4 w-[44px] h-[44px] rounded-[10px]
+                            flex items-center justify-center font-extrabold text-[15px] text-white"
+                 style={{ background: 'var(--orange)' }}>
+              ST
+            </div>
+            <h1 className="font-extrabold text-[18px] text-[var(--text-1)] tracking-tight">
+              Choisir un compte
+            </h1>
+            <p className="mt-1.5 text-[13px] text-[var(--text-3)]">
+              Votre email est associé à plusieurs comptes marchands.
+            </p>
+          </div>
+          <div className="space-y-2">
+            {pendingAccounts.map((acc) => (
+              <button
+                key={acc.merchantId}
+                disabled={selectLoading}
+                onClick={() => onSelectAccount(acc.merchantId)}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-[8px] border
+                           border-[var(--border-med)] text-left hover:border-[var(--orange)]
+                           hover:bg-[var(--orange-bg)] transition-colors disabled:opacity-50"
+              >
+                <span className="w-8 h-8 rounded-full bg-[var(--orange-bg)] border border-[var(--orange-border)]
+                                 flex items-center justify-center text-[11px] font-bold text-[var(--orange-dark)] shrink-0">
+                  {acc.merchantName.charAt(0).toUpperCase()}
+                </span>
+                <span className="text-[13px] font-semibold text-[var(--text-1)] truncate">
+                  {acc.merchantName}
+                </span>
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => { setPendingAccounts(null); setPendingCredentials(null) }}
+            className="mt-5 w-full text-center text-[12px] text-[var(--text-3)] hover:text-[var(--text-1)] transition-colors"
+          >
+            ← Retour
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (

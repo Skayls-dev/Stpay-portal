@@ -13,6 +13,7 @@ const LABELS: Record<string, string> = {
   settlements:    'Settlements',
   traceability:   'Traceability',
   providers:      'Santé API',
+  'payout-accounts': 'Comptes de paiement',
   profile:        'Mon profil',
 }
 
@@ -42,9 +43,6 @@ export default function Topbar() {
       )}
 
       <div className="flex items-center gap-2">
-        <button className="btn-secondary" onClick={() => navigate('/')}>
-          Accueil
-        </button>
         <button className="btn-secondary">
           <IconSearch />
           Rechercher
@@ -53,11 +51,6 @@ export default function Topbar() {
           <button className="btn-primary" onClick={() => navigate('/demo/webshop')}>
             <IconPlus />
             Simulation
-          </button>
-        )}
-        {isSuperAdmin && (
-          <button className="btn-secondary" onClick={() => navigate('/demo/escrow')}>
-            Démo Escrow
           </button>
         )}
       </div>

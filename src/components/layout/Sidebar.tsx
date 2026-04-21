@@ -1,5 +1,5 @@
 // src/components/layout/Sidebar.tsx
-import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../../hooks/useAuth'
 import { healthApi } from '../../lib/api/modules'
@@ -29,6 +29,26 @@ function IconGuide({ className }: { className?: string }) {
   )
 }
 
+function IconCompliance({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <rect x="2" y="1.5" width="10" height="11" rx="1.2" stroke="currentColor" strokeWidth="1.2"/>
+      <path d="M4.5 5h5M4.5 7.5h5M4.5 10h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+      <path d="M9.5 9l1 1 1.5-1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
+function IconVideo({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <rect x="1" y="2.5" width="8.5" height="9" rx="1.2" stroke="currentColor" strokeWidth="1.2"/>
+      <path d="M9.5 5.5l3.5-2v7l-3.5-2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M4.5 5.5v3l2.5-1.5z" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
 function IconSettings({ className }: { className?: string }) {
   return (
     <svg className={className} width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -40,15 +60,19 @@ function IconSettings({ className }: { className?: string }) {
   )
 }
 
+function IconKri({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <path d="M1 10.5l3.5-4 2.5 2.5L10 5l3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+      <circle cx="12" cy="3" r="1.5" fill="currentColor" opacity="0.7"/>
+    </svg>
+  )
+}
+
 interface NavItem {
   label: string; icon: React.ReactNode
   to?: string; href?: string; target?: string; rel?: string
   badge?: { text: string; variant: 'red' | 'green' | 'amber' }; end?: boolean
-}
-
-interface NavSection {
-  label: string
-  items: NavItem[]
 }
 
 function NavBadge({ text, variant }: { text: string; variant: 'red' | 'green' | 'amber' }) {
@@ -84,7 +108,7 @@ export default function Sidebar() {
     refetchInterval: 15_000,
   })
 
-  const adminSections: NavSection[] = [
+  const adminSections = [
     {
       label: 'Pilotage',
       items: [
@@ -107,12 +131,15 @@ export default function Sidebar() {
       items: [
         { to: `${basePath}/webhooks`,   label: 'Webhooks',   icon: <IconWebhook />, badge: { text: '2', variant: 'red' as const } },
         { to: `${basePath}/providers`,  label: 'Santé API',  icon: <IconHealth /> },
-        { to: `${basePath}/config`,     label: 'Config Admin', icon: <IconSettings /> },
+        { to: `${basePath}/kri`,        label: 'KRI Alertes', icon: <IconKri /> },
+        { to: `${basePath}/compliance`,   label: 'Conformité',      icon: <IconCompliance /> },
+        { to: `${basePath}/guide-videos`, label: 'Vidéos tutoriels', icon: <IconVideo /> },
+        { to: `${basePath}/config`,       label: 'Config Admin',     icon: <IconSettings /> },
       ],
     },
   ]
 
-  const merchantSections: NavSection[] = [
+  const merchantSections = [
     {
       label: 'Principal',
       items: [
@@ -133,20 +160,18 @@ export default function Sidebar() {
       label: 'Développeur',
       items: [
         { to: `${basePath}/developer`, label: 'Developer Portal', icon: <IconDev /> },
-        {
-          to: `${basePath}/guides`,
-          label: 'Guides Integration',
-          icon: <IconGuide />,
+        { to: `${basePath}/guides`,    label: 'Guides Intégration', icon: <IconGuide />,
           ...(showGuidesNewBadge ? { badge: { text: 'NEW', variant: 'amber' as const } } : {}),
         },
         { to: `${basePath}/simulator`, label: 'Simulateur USSD', icon: <IconSim /> },
+        { to: `${basePath}/payout-accounts`, label: 'Comptes de paiement', icon: <IconList /> },
         { to: `${basePath}/profile`,   label: 'Mon profil',       icon: <IconProfile /> },
       ],
     },
   ]
 
   const sections = isSuperAdmin ? adminSections : merchantSections
-  const initials = (user.name || 'Utilisateur')
+  const initials = (user.name || user.email || 'U')
     .split(' ').map((w: string) => w[0]?.toUpperCase()).slice(0, 2).join('')
 
   const handleLogout = () => {
@@ -159,7 +184,7 @@ export default function Sidebar() {
                       border-r border-[var(--border)] h-full select-none">
 
       <div className="px-4 py-[18px] border-b border-[var(--border-soft)]">
-        <Link to="/" className="group flex items-center gap-2.5 rounded-[10px] transition-colors hover:bg-[var(--bg-hover)] px-1 py-1">
+        <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-[8px] flex items-center justify-center
                           text-white font-extrabold text-[12px] flex-shrink-0"
                style={{ background: 'var(--orange)' }}>
@@ -167,9 +192,9 @@ export default function Sidebar() {
           </div>
           <div>
             <p className="font-extrabold text-[14px] text-[var(--text-1)] leading-none tracking-tight">ST Pay</p>
-            <p className="text-[10px] text-[var(--text-4)] mt-0.5 tracking-wide group-hover:text-[var(--text-3)]">Retour a l'accueil</p>
+            <p className="text-[10px] text-[var(--text-4)] mt-0.5 tracking-wide">Payment Gateway</p>
           </div>
-        </Link>
+        </div>
         <div className="mt-2.5 inline-flex items-center gap-1.5 px-2 py-[3px] rounded-full
                         text-[10px] font-semibold font-mono border"
              style={{ background: 'var(--orange-bg)', borderColor: 'var(--orange-border)', color: 'var(--orange-dark)' }}>

@@ -1,96 +1,159 @@
-// src/pages/Overview.tsx
-import React, { useMemo } from 'react'
+﻿// src/pages/Overview.tsx
+import React, { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { analyticsApi, transactionsApi, balanceApi, POLL_INTERVAL_TRANSACTIONS } from '../lib/api/modules'
+import { analyticsApi, transactionsApi, POLL_INTERVAL_TRANSACTIONS } from '../lib/api/modules'
 import { Badge, DataTable } from '../components/ui'
 import { IconArrowUp, IconArrowDown } from '../components/icons/NavIcons'
 import type { DataTableColumn } from '../components/ui'
 import type { Transaction } from '../lib/api/modules'
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function fmtDate(iso?: string | null) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
 }
 
+// â”€â”€â”€ Dev Kit banner (merchant only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function DevKitBanner() {
+  const apiKey = localStorage.getItem('stpay_api_key') ?? ''
+  const [copied, setCopied] = useState(false)
+
+  const copy = () => {
+    if (!apiKey) return
+    navigator.clipboard.writeText(apiKey).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  const maskedKey = apiKey
+    ? `${apiKey.slice(0, 12)}${'•'.repeat(Math.max(0, apiKey.length - 16))}${apiKey.slice(-4)}`
+    : 'Aucune clé disponible'
+
+  return (
+    <div className="rounded-[var(--r-md)] border border-[var(--border-med)]
+                    bg-[var(--bg-raised)] px-4 py-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[11px] font-bold text-[var(--text-1)]">⚡ Clé API test</span>
+            <Badge color="amber">sandbox</Badge>
+          </div>
+          <p className="font-mono text-[11px] text-[var(--text-2)] truncate" title={apiKey}>
+            {maskedKey}
+          </p>
+          <p className="text-[10px] text-[var(--text-4)] mt-1">
+            Numéros magiques : <code className="font-mono">***001</code> success · <code className="font-mono">***002</code> échec · <code className="font-mono">***003</code> timeout
+          </p>
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <button
+            onClick={copy}
+            disabled={!apiKey}
+            className="px-3 py-1.5 rounded-[6px] border border-[var(--border-med)]
+                       text-[11px] font-semibold text-[var(--text-2)]
+                       hover:border-[var(--orange)] hover:text-[var(--orange)]
+                       transition-colors disabled:opacity-40"
+          >
+            {copied ? 'Copié' : 'Copier'}
+          </button>
+          <Link
+            to="/merchant/developer"
+            className="px-3 py-1.5 rounded-[6px] text-[11px] font-semibold text-white
+                       transition-colors"
+            style={{ background: 'var(--orange)' }}
+          >
+            Portail dev
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── KPI Card ─────────────────────────────────────────────────────────────────
+function KpiCard({ label, value, delta, accentColor, iconBg, icon }: {
+  label: string
+  value: string
+  delta: { text: string; up: boolean | null }
+  accentColor?: string
+  iconBg: string
+  icon: React.ReactNode
+}) {
+  return (
+    <div className="panel flex flex-col gap-2 px-4 py-3">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] text-[var(--text-3)]">{label}</span>
+        <span className={`w-7 h-7 flex items-center justify-center rounded-[6px] ${iconBg}`}>
+          {icon}
+        </span>
+      </div>
+      <p className="text-[22px] font-bold font-display leading-none" style={{ color: accentColor ?? 'var(--text-1)' }}>
+        {value}
+      </p>
+      {delta.text && (
+        <p className={`text-[11px] font-medium ${
+          delta.up === true ? 'text-[var(--green)]' : delta.up === false ? 'text-[var(--red)]' : 'text-[var(--text-3)]'
+        }`}>
+          {delta.up === true ? '\u25b2' : delta.up === false ? '\u25bc' : ''} {delta.text}
+        </p>
+      )}
+    </div>
+  )
+}
+
 // ─── Provider badge ───────────────────────────────────────────────────────────
 const PROV_CLS: Record<string, string> = {
-  MTN: 'prov-mtn', ORANGE: 'prov-ora',
+  MTN: 'prov-mtn', ORANGE: 'prov-ora', WAVE: 'prov-wav', MOOV: 'prov-moov',
 }
 
 function ProviderBadge({ name }: { name: string }) {
   return (
     <span className={`inline-flex items-center justify-center w-[24px] h-[24px]
                       rounded-[5px] text-[8px] font-extrabold font-mono flex-shrink-0
-                      ${PROV_CLS[name?.toUpperCase()] ?? 'prov-ora'}`}>
+                      ${PROV_CLS[name?.toUpperCase()] ?? 'prov-moov'}`}>
       {name?.slice(0, 3).toUpperCase() ?? '???'}
     </span>
   )
 }
 
-// ─── KPI card ─────────────────────────────────────────────────────────────────
-function KpiCard({ label, value, delta, iconBg, icon, accentColor }: {
-  label: string; value: string; iconBg: string; icon: React.ReactNode
-  delta?: { text: string; up: boolean | null }; accentColor?: string
-}) {
-  return (
-    <div className="kpi-card">
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] font-medium text-[var(--text-3)]">{label}</span>
-        <div className={`w-6 h-6 rounded-[6px] flex items-center justify-center ${iconBg}`}>
-          {icon}
-        </div>
-      </div>
-      <p className="font-extrabold text-[22px] leading-none tracking-tight"
-         style={{ color: accentColor || 'var(--text-1)' }}>
-        {value}
-      </p>
-      {delta && (
-        <div className={`flex items-center gap-1 text-[11px] font-semibold
-          ${delta.up === true  ? 'text-[var(--green)]'  : ''}
-          ${delta.up === false ? 'text-[var(--red)]'    : ''}
-          ${delta.up === null  ? 'text-[var(--text-3)]' : ''}`}>
-          {delta.up === true  && <IconArrowUp />}
-          {delta.up === false && <IconArrowDown />}
-          {delta.text}
-        </div>
-      )}
-    </div>
-  )
-}
+// ─── Spark bar ────────────────────────────────────────────────────────────────
+const SPARK_LABELS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 
-// ─── Sparkline ────────────────────────────────────────────────────────────────
-const SPARK = [35, 55, 42, 68, 80, 100]
-const SPARK_LABELS = ['10 mar','11 mar','12 mar','13 mar','14 mar','Auj.']
-
-function Sparkline() {
+function SparkBar({ data }: { data: number[] }) {
+  const max = Math.max(...data, 1)
   return (
-    <div className="px-4 py-3 border-b border-[var(--border-soft)]">
-      <div className="flex items-end gap-[3px] h-9">
-        {SPARK.map((h, i) => (
-          <div key={i}
-               className={`flex-1 rounded-t-[2px] transition-colors
-                 ${i === SPARK.length - 1
-                   ? 'bg-[var(--orange)]'
+    <div className="flex-1">
+      <div className="flex items-end gap-[2px] h-8">
+        {data.map((v, i) => {
+          const h = Math.round((v / max) * 100)
+          return (
+            <div
+              key={i}
+              className={`flex-1 rounded-[2px] transition-colors
+                         ${i === data.length - 1
+                   ? 'bg-[var(--orange)] hover:bg-[var(--orange-dark)]'
                    : 'bg-[var(--border-soft)] hover:bg-[var(--orange-border)]'}`}
                style={{ height: `${h}%` }} />
-        ))}
+          )
+        })}
       </div>
       <div className="flex justify-between mt-1.5">
-        {SPARK_LABELS.map((l) => (
-          <span key={l} className="text-[9px] text-[var(--text-4)] font-mono">{l}</span>
+        {SPARK_LABELS.map((l, i) => (
+          <span key={i} className="text-[9px] text-[var(--text-4)] font-mono">{l}</span>
         ))}
       </div>
     </div>
   )
 }
 
-// ─── Providers panel ──────────────────────────────────────────────────────────
+
 const PROVIDERS = [
   { name: 'MTN MoMo',     short: 'MTN', pct: 63, vol: 89_200_000, bar: '#FFC700' },
   { name: 'Orange Money', short: 'ORA', pct: 25, vol: 35_800_000, bar: '#FF6600' },
+  { name: 'Wave',         short: 'WAV', pct: 12, vol: 17_800_000, bar: '#3B82F6' },
 ]
 
 function ProvidersPanel() {
@@ -123,13 +186,13 @@ function ProvidersPanel() {
   )
 }
 
-// ─── Escrow panel ─────────────────────────────────────────────────────────────
-function EscrowPanel({ reservedBalance }: { reservedBalance?: number }) {
+// â”€â”€â”€ Escrow panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function EscrowPanel() {
   return (
     <div className="panel">
       <div className="panel-header">
         <span className="panel-title">Escrow actif</span>
-        <span className="panel-link">Détail →</span>
+        <span className="panel-link">Détail</span>
       </div>
       <div className="p-4 space-y-3">
         <div>
@@ -138,20 +201,49 @@ function EscrowPanel({ reservedBalance }: { reservedBalance?: number }) {
           </p>
           <p className="font-extrabold text-[22px] tracking-tight leading-none"
              style={{ color: 'var(--orange)' }}>
-            {reservedBalance != null
-              ? new Intl.NumberFormat('fr-FR').format(reservedBalance)
-              : '—'}
+            12 450 000
           </p>
           <p className="text-[11px] text-[var(--text-3)] mt-1">
-            XAF · fonds en séquestre actif
+            XAF · 3 livraisons en attente
           </p>
+        </div>
+        <div>
+          <div className="flex justify-between text-[10px] mb-1">
+            <span className="text-[var(--text-3)]">Libéré ce mois</span>
+            <span className="font-semibold" style={{ color: 'var(--orange)' }}>68 %</span>
+          </div>
+          <div className="h-[3px] bg-[var(--border-soft)] rounded-full overflow-hidden">
+            <div className="h-full rounded-full" style={{ width: '68%', background: 'var(--orange)' }} />
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          {[
+            { ref: 'ESC-BRU-KIN-0042', amt: '85 000 XAF', status: 'pending', label: 'En transit' },
+            { ref: 'ESC-CDK-ABJ-0018', amt: '42 500 XAF', status: 'success', label: 'Livré' },
+          ].map((item) => (
+            <div key={item.ref}
+                 className="flex items-center justify-between px-3 py-2
+                            bg-[var(--bg-subtle)] rounded-[var(--r-sm)]
+                            border border-[var(--border-soft)]">
+              <div>
+                <p className="text-[10px] font-mono text-[var(--text-2)]">{item.ref}</p>
+                <p className="text-[9px] text-[var(--text-4)] mt-0.5">Code : ●●●●●●</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[11px] font-bold font-mono text-[var(--text-1)]">{item.amt}</p>
+                <Badge color={item.status === 'success' ? 'emerald' : 'amber'} dot className="mt-0.5">
+                  {item.label}
+                </Badge>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
   )
 }
 
-// ─── Top Merchants ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Top Merchants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function TopMerchantsPanel({ merchants }: { merchants: { merchant: string; amount: number }[] }) {
   if (!merchants.length) return null
   return (
@@ -227,7 +319,7 @@ function AdminOpsPanel() {
   )
 }
 
-// ─── Table columns ────────────────────────────────────────────────────────────
+
 const RECENT_COLS: DataTableColumn<Transaction>[] = [
   {
     key: 'prov', header: '', className: 'w-10',
@@ -265,7 +357,7 @@ const RECENT_COLS: DataTableColumn<Transaction>[] = [
   },
 ]
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function Overview() {
   const { role, user, isSuperAdmin } = useAuth()
 
@@ -284,13 +376,6 @@ export default function Overview() {
     queryKey: ['top-merchants'],
     queryFn: analyticsApi.topMerchants,
     enabled: isSuperAdmin,
-  })
-
-  const { data: merchantBalance } = useQuery({
-    queryKey: ['merchant-balance'],
-    queryFn: balanceApi.get,
-    staleTime: 60_000,
-    enabled: !isSuperAdmin,
   })
 
   const kpis = useMemo(() => {
@@ -317,6 +402,8 @@ export default function Overview() {
           </div>
         </div>
       )}
+
+      {!isSuperAdmin && <DevKitBanner />}
 
       {/* Period tabs */}
       <div className="flex items-center justify-between">
@@ -367,10 +454,8 @@ export default function Overview() {
             icon={<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2.5 7L5 9.5l5.5-5.5" stroke="var(--green)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>}
           />
           <KpiCard label="Escrow actif"
-            value={merchantBalance
-              ? `${(merchantBalance.reservedBalance / 1_000_000).toFixed(1)}M`
-              : '—'}
-            delta={{ text: 'fonds séquestrés', up: null }}
+            value="12.4M"
+            delta={{ text: '3 en attente', up: null }}
             iconBg="bg-[var(--amber-bg)]"
             icon={<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1.5" y="4" width="10" height="8" rx="1.5" stroke="var(--amber)" strokeWidth="1.2"/><path d="M4.5 4V3a2.5 2.5 0 015 0v1" stroke="var(--amber)" strokeWidth="1.2" strokeLinecap="round"/></svg>}
           />
@@ -383,9 +468,9 @@ export default function Overview() {
         <div className="panel">
           <div className="panel-header">
             <span className="panel-title">{isSuperAdmin ? 'Transactions globales' : 'Transactions récentes'}</span>
-            <span className="panel-link">{isSuperAdmin ? 'Analyse globale →' : 'Voir tout →'}</span>
+            <span className="panel-link">{isSuperAdmin ? 'Analyse globale â†’' : 'Voir tout'}</span>
           </div>
-          <Sparkline />
+          <SparkBar data={[40, 60, 30, 80, 55, 70, 90]} />
           {recentLoading ? (
             <p className="p-4 text-[13px] text-[var(--text-3)]">Chargement…</p>
           ) : (
@@ -408,7 +493,7 @@ export default function Overview() {
               <AdminOpsPanel />
             </>
           ) : (
-            <EscrowPanel reservedBalance={merchantBalance?.reservedBalance} />
+            <EscrowPanel />
           )}
         </div>
       </div>

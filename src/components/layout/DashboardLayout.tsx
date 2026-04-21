@@ -2,7 +2,6 @@
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
-import BackendStatusBanner from './BackendStatusBanner'
 import { useAuth } from '../../hooks/useAuth'
 
 export default function DashboardLayout() {
@@ -13,7 +12,6 @@ export default function DashboardLayout() {
       <Sidebar />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <Topbar />
-        <BackendStatusBanner />
         <main className="flex-1 overflow-y-auto p-5">
           <Outlet />
         </main>

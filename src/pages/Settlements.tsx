@@ -6,8 +6,8 @@ import { useAuth } from '../hooks/useAuth'
 import { Badge, Button, Card, Input, Select } from '../components/ui'
 import {
   merchantsApi,
+  payoutAccountsApi,
   settlementsApi,
-  balanceApi,
   type SettlementItem,
   type SettlementTransactionItem,
 } from '../lib/api/modules'
@@ -56,7 +56,7 @@ function formatOrigin(item: SettlementItem) {
 }
 
 export default function Settlements() {
-  const { isSuperAdmin } = useAuth()
+  const { isSuperAdmin, user } = useAuth()
   const queryClient = useQueryClient()
 
   const [page, setPage] = useState(1)
@@ -65,11 +65,12 @@ export default function Settlements() {
   const [merchantId, setMerchantId] = useState('')
   const [currency, setCurrency] = useState('XAF')
   const [triggerNotes, setTriggerNotes] = useState('')
+  const [selectedPayoutAccountId, setSelectedPayoutAccountId] = useState<string>('')
 
-  const [payoutMerchantId, setPayoutMerchantId] = useState('')
-  const [accountType, setAccountType] = useState<'MOBILE_MONEY' | 'BANK'>('MOBILE_MONEY')
-  const [accountNumber, setAccountNumber] = useState('')
-  const [provider, setProvider] = useState('MTN')
+  // Merchant per-provider payout editing
+  const [editingProvider, setEditingProvider] = useState<string | null>(null)
+  const [editAccountNumber, setEditAccountNumber] = useState('')
+  const [editHolderName, setEditHolderName] = useState('')
 
   const [processNotes, setProcessNotes] = useState<Record<string, string>>({})
   const [expandedSettlementId, setExpandedSettlementId] = useState<string | null>(null)
@@ -81,13 +82,6 @@ export default function Settlements() {
   const settlementsKey = isSuperAdmin
     ? ['settlements', 'all', page, pageSize]
     : ['settlements', 'mine']
-
-  const { data: merchantBalance } = useQuery({
-    queryKey: ['merchant-balance'],
-    queryFn: balanceApi.get,
-    staleTime: 60_000,
-    enabled: !isSuperAdmin,
-  })
 
   const settlementsQuery = useQuery({
     queryKey: settlementsKey,
@@ -117,6 +111,25 @@ export default function Settlements() {
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }))
   }, [merchantsQuery.data])
 
+  const payoutAccountQuery = useQuery({
+    queryKey: ['merchant-payout-account', merchantId],
+    queryFn: () => settlementsApi.getPayoutAccount(merchantId),
+    enabled: isSuperAdmin && !!merchantId,
+  })
+
+  // Reset selection when merchant changes
+  React.useEffect(() => {
+    setSelectedPayoutAccountId('')
+  }, [merchantId])
+
+  // Auto-select first account when accounts load
+  React.useEffect(() => {
+    const accounts = payoutAccountQuery.data?.accounts
+    if (accounts?.length && !selectedPayoutAccountId) {
+      setSelectedPayoutAccountId(accounts[0].id)
+    }
+  }, [payoutAccountQuery.data])
+
   const triggerMutation = useMutation({
     mutationFn: settlementsApi.trigger,
     onSuccess: () => {
@@ -130,12 +143,51 @@ export default function Settlements() {
     },
   })
 
-  const payoutMutation = useMutation({
-    mutationFn: settlementsApi.updatePayoutAccount,
-    onSuccess: () => {
-      toast.success('Compte de payout mis à jour')
-      setAccountNumber('')
+  const forceCompleteMutation = useMutation({
+    mutationFn: ({ merchantId, provider }: { merchantId: string; provider?: string }) =>
+      settlementsApi.forceCompletePending({ merchantId, provider: provider || undefined, limit: 100 }),
+    onSuccess: (data) => {
+      toast.success(`${data.forced} transaction(s) confirmée(s) — le solde marchand a été mis à jour`)
       queryClient.invalidateQueries({ queryKey: ['settlements'] })
+      queryClient.invalidateQueries({ queryKey: ['settlement-merchants'] })
+    },
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Echec de la confirmation'
+      toast.error(message)
+    },
+  })
+
+  // Merchant own payout accounts (per provider)
+  const ownPayoutAccountsQuery = useQuery({
+    queryKey: ['own-payout-accounts'],
+    queryFn: payoutAccountsApi.list,
+    enabled: !isSuperAdmin,
+  })
+
+  const payoutUpsertMutation = useMutation({
+    mutationFn: async (input: { provider: string; accountNumber: string; accountHolderName: string }) => {
+      const existing = ownPayoutAccountsQuery.data?.find((a) => a.provider === input.provider)
+      if (existing) {
+        return payoutAccountsApi.update(existing.id, {
+          provider: input.provider,
+          accountNumber: input.accountNumber,
+          accountHolderName: input.accountHolderName,
+          currency: 'XAF',
+          isDefault: existing.isDefault,
+        })
+      }
+      return payoutAccountsApi.create({
+        provider: input.provider,
+        accountNumber: input.accountNumber,
+        accountHolderName: input.accountHolderName,
+        currency: 'XAF',
+        isDefault: false,
+      })
+    },
+    onSuccess: () => {
+      toast.success('Compte de payout enregistré')
+      setEditingProvider(null)
+      queryClient.invalidateQueries({ queryKey: ['own-payout-accounts'] })
     },
     onError: (error: unknown) => {
       const message = error instanceof Error ? error.message : 'Echec de la mise à jour'
@@ -189,95 +241,171 @@ export default function Settlements() {
       merchantId,
       currency,
       notes: triggerNotes.trim() || undefined,
+      payoutAccountId: selectedPayoutAccountId || undefined,
     })
   }
 
-  const submitPayout = (event: React.FormEvent) => {
-    event.preventDefault()
-    if (!payoutMerchantId || !accountNumber.trim() || !provider.trim()) {
-      toast.error('Tous les champs payout sont requis')
+  const submitPayoutEdit = (providerKey: string) => {
+    if (!editAccountNumber.trim() || !editHolderName.trim()) {
+      toast.error('Numéro et nom du titulaire requis')
       return
     }
-
-    payoutMutation.mutate({
-      merchantId: payoutMerchantId,
-      accountType,
-      accountNumber: accountNumber.trim(),
-      provider: provider.trim(),
+    payoutUpsertMutation.mutate({
+      provider: providerKey,
+      accountNumber: editAccountNumber.trim(),
+      accountHolderName: editHolderName.trim(),
     })
+  }
+
+  const startEdit = (providerKey: string) => {
+    const existing = ownPayoutAccountsQuery.data?.find((a) => a.provider === providerKey)
+    setEditingProvider(providerKey)
+    setEditAccountNumber(existing?.accountNumber ?? '')
+    setEditHolderName(existing?.accountHolderName ?? '')
   }
 
   return (
     <div className="space-y-4">
-      {!isSuperAdmin && merchantBalance && merchantBalance.reservedBalance > 0 && (
-        <div className="rounded-[8px] border border-[var(--amber-border)] bg-[var(--amber-bg)] px-3 py-2.5 text-[11px]">
-          <span className="font-semibold text-[var(--amber-dark)]">
-            {new Intl.NumberFormat('fr-FR').format(merchantBalance.reservedBalance)} XAF
-          </span>
-          {' '}sont actuellement séquestrés (escrow actif) et exclus du virement.
-          Ces fonds seront disponibles après confirmation de livraison.
-        </div>
-      )}
       {isSuperAdmin && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
-            <h2 className="text-[14px] font-bold text-[var(--text-1)]">Déclencher un settlement</h2>
-            <form className="mt-3 space-y-2.5" onSubmit={submitTrigger}>
-              <Select value={merchantId} onChange={(e) => setMerchantId(e.target.value)}>
-                <option value="">Choisir un marchand</option>
-                {merchantOptions.map((merchant) => (
-                  <option key={merchant.id} value={merchant.id}>{merchant.name}</option>
-                ))}
-              </Select>
-              <div className="grid grid-cols-2 gap-2">
-                <Select value={currency} onChange={(e) => setCurrency(e.target.value)}>
-                  <option value="XAF">XAF</option>
-                  <option value="EUR">EUR</option>
-                  <option value="USD">USD</option>
-                </Select>
-                <Input
-                  placeholder="Note (optionnel)"
-                  value={triggerNotes}
-                  onChange={(e) => setTriggerNotes(e.target.value)}
-                />
+        <Card>
+          <h2 className="text-[14px] font-bold text-[var(--text-1)]">Déclencher un settlement</h2>
+          <form className="mt-3 space-y-2.5" onSubmit={submitTrigger}>
+            <Select value={merchantId} onChange={(e) => setMerchantId(e.target.value)}>
+              <option value="">Choisir un marchand</option>
+              {merchantOptions.map((merchant) => (
+                <option key={merchant.id} value={merchant.id}>{merchant.name}</option>
+              ))}
+            </Select>
+
+            {merchantId && (
+              <div className="rounded-md border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 py-2.5 space-y-1.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-4)]">Compte payout du marchand</p>
+                {payoutAccountQuery.isLoading ? (
+                  <p className="text-[12px] text-[var(--text-3)]">Chargement…</p>
+                ) : !payoutAccountQuery.data?.accounts?.length ? (
+                  <p className="text-[12px] text-amber-600">⚠ Aucun compte payout configuré par ce marchand</p>
+                ) : (
+                  <div className="divide-y divide-[var(--border-soft)]">
+                    {payoutAccountQuery.data.accounts.map((acc) => (
+                      <label
+                        key={acc.id}
+                        className={`flex items-center gap-3 py-2 cursor-pointer rounded transition-colors px-1 ${
+                          selectedPayoutAccountId === acc.id
+                            ? 'bg-[var(--bg-active)] ring-1 ring-[var(--accent)]'
+                            : 'hover:bg-[var(--bg-hover)]'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="payoutAccount"
+                          value={acc.id}
+                          checked={selectedPayoutAccountId === acc.id}
+                          onChange={() => setSelectedPayoutAccountId(acc.id)}
+                          className="accent-[var(--accent)]"
+                        />
+                        <span className="w-16 text-[11px] font-semibold text-[var(--text-1)]">{acc.provider}</span>
+                        <span className="font-mono text-[12px] text-[var(--text-2)]">{acc.accountNumber}</span>
+                        <span className="text-[11px] text-[var(--text-3)]">· {acc.accountHolderName}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-2">
+              <Select value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                <option value="XAF">XAF</option>
+                <option value="EUR">EUR</option>
+                <option value="USD">USD</option>
+              </Select>
+              <Input
+                placeholder="Note (optionnel)"
+                value={triggerNotes}
+                onChange={(e) => setTriggerNotes(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
               <Button type="submit" disabled={triggerMutation.isPending}>
                 {triggerMutation.isPending ? 'Traitement…' : 'Déclencher'}
               </Button>
-            </form>
-          </Card>
+              {merchantId && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={forceCompleteMutation.isPending}
+                  onClick={() => {
+                    const provider = selectedPayoutAccountId
+                      ? payoutAccountQuery.data?.accounts?.find(a => a.id === selectedPayoutAccountId)?.provider
+                      : undefined
+                    forceCompleteMutation.mutate({ merchantId, provider })
+                  }}
+                  title="Marque les transactions PENDING comme SUCCESS pour pouvoir déclencher un settlement (test uniquement)"
+                >
+                  {forceCompleteMutation.isPending ? 'Confirmation…' : '⚡ Confirmer transactions PENDING'}
+                </Button>
+              )}
+            </div>
+          </form>
+        </Card>
+      )}
 
-          <Card>
-            <h2 className="text-[14px] font-bold text-[var(--text-1)]">Configurer le compte payout</h2>
-            <form className="mt-3 space-y-2.5" onSubmit={submitPayout}>
-              <Select value={payoutMerchantId} onChange={(e) => setPayoutMerchantId(e.target.value)}>
-                <option value="">Choisir un marchand</option>
-                {merchantOptions.map((merchant) => (
-                  <option key={merchant.id} value={merchant.id}>{merchant.name}</option>
-                ))}
-              </Select>
-              <div className="grid grid-cols-2 gap-2">
-                <Select value={accountType} onChange={(e) => setAccountType(e.target.value as 'MOBILE_MONEY' | 'BANK')}>
-                  <option value="MOBILE_MONEY">Mobile Money</option>
-                  <option value="BANK">Banque</option>
-                </Select>
-                <Input
-                  placeholder="Provider (MTN, ORANGE...)"
-                  value={provider}
-                  onChange={(e) => setProvider(e.target.value)}
-                />
-              </div>
-              <Input
-                placeholder={accountType === 'BANK' ? 'IBAN / compte bancaire' : 'Numéro mobile'}
-                value={accountNumber}
-                onChange={(e) => setAccountNumber(e.target.value)}
-              />
-              <Button type="submit" variant="secondary" disabled={payoutMutation.isPending}>
-                {payoutMutation.isPending ? 'Sauvegarde…' : 'Mettre à jour'}
-              </Button>
-            </form>
-          </Card>
-        </div>
+      {!isSuperAdmin && (
+        <Card>
+          <h2 className="text-[14px] font-bold text-[var(--text-1)]">Mes comptes de payout</h2>
+          <p className="mt-1 text-[12px] text-[var(--text-3)]">
+            Configurez un compte par opérateur. ST Pay versera les fonds MTN sur votre numéro MTN, et les fonds Orange sur votre numéro Orange.
+          </p>
+          <div className="mt-3 divide-y divide-[var(--border-soft)]">
+            {(['MTN', 'ORANGE'] as const).map((prov) => {
+              const existing = ownPayoutAccountsQuery.data?.find((a) => a.provider === prov)
+              const isEditing = editingProvider === prov
+              return (
+                <div key={prov} className="py-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="w-16 text-[13px] font-semibold text-[var(--text-1)]">{prov}</span>
+                      {existing ? (
+                        <span className="font-mono text-[12px] text-[var(--text-2)]">{existing.accountNumber}</span>
+                      ) : (
+                        <span className="text-[12px] text-[var(--text-4)] italic">Non configuré</span>
+                      )}
+                    </div>
+                    {!isEditing && (
+                      <Button variant="ghost" onClick={() => startEdit(prov)}>
+                        {existing ? 'Modifier' : '+ Ajouter'}
+                      </Button>
+                    )}
+                  </div>
+                  {isEditing && (
+                    <div className="mt-2 space-y-2">
+                      <Input
+                        placeholder="Numéro mobile (ex: 6XXXXXXXX)"
+                        value={editAccountNumber}
+                        onChange={(e) => setEditAccountNumber(e.target.value)}
+                      />
+                      <Input
+                        placeholder="Nom du titulaire du compte"
+                        value={editHolderName}
+                        onChange={(e) => setEditHolderName(e.target.value)}
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          variant="secondary"
+                          disabled={payoutUpsertMutation.isPending}
+                          onClick={() => submitPayoutEdit(prov)}
+                        >
+                          {payoutUpsertMutation.isPending ? 'Sauvegarde…' : 'Enregistrer'}
+                        </Button>
+                        <Button variant="ghost" onClick={() => setEditingProvider(null)}>Annuler</Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </Card>
       )}
 
       <Card>

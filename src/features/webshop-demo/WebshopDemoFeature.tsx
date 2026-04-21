@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { demoCatalog, demoProviders, type DemoProduct } from './mockCatalog'
 
@@ -11,16 +11,9 @@ type DemoStatus = 'idle' | 'creating' | 'pending' | 'success'
 type WidgetStage = 'cart' | 'auth' | 'confirm' | 'done'
 type CheckoutMode = 'simulated' | 'live'
 type DemoFlowMode = 'widget' | 'api'
-type PhoneModalMode = 'widget' | 'api' | null
-type EscrowMode = 'pickup_code' | 'auto_timeout' | 'dual_confirm'
-type EscrowStep = 'held' | 'in_transit' | 'delivered' | 'released'
-type CheckoutErrors = {
-  name: string
-  phone: string
-}
 
 const fmtXaf = (n: number) => `${new Intl.NumberFormat('fr-FR').format(n)} XAF`
-const PIN_PROVIDERS = new Set(['MTN', 'ORANGE'])
+const PIN_PROVIDERS = new Set(['MTN', 'ORANGE', 'MOOV'])
 const buildFallbackImage = (label: string) =>
   `data:image/svg+xml;utf8,${encodeURIComponent(
     `<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='900'>
@@ -69,235 +62,28 @@ const PROVIDER_PHONE_THEME: Record<string, {
     okBg: '#6B2F06',
     okText: '#FFD2A8',
   },
-}
-
-const ESCROW_STEPS: EscrowStep[] = ['held', 'in_transit', 'delivered', 'released']
-const ESCROW_STEP_LABELS: Record<EscrowStep, string> = {
-  held: 'Retenu',
-  in_transit: 'En transit',
-  delivered: 'Livré',
-  released: 'Libéré',
-}
-
-function EscrowLifecycleStepper({
-  step,
-  setStep,
-  releaseMode,
-  pickupCode,
-}: {
-  step: EscrowStep
-  setStep: (s: EscrowStep) => void
-  releaseMode: EscrowMode
-  pickupCode: string | null
-}) {
-  const currentIdx = ESCROW_STEPS.indexOf(step)
-  const [countdown, setCountdown] = useState<number | null>(null)
-
-  useEffect(() => {
-    if (releaseMode !== 'auto_timeout' || step !== 'in_transit') return
-    setCountdown(10)
-    const interval = setInterval(() => {
-      setCountdown((n) => {
-        if (n === null || n <= 1) {
-          clearInterval(interval)
-          setStep('delivered')
-          setTimeout(() => setStep('released'), 600)
-          return null
-        }
-        return n - 1
-      })
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [step, releaseMode])
-
-  const handleSimulateTimeout = () => {
-    setStep('delivered')
-    setTimeout(() => setStep('released'), 800)
-  }
-
-  return (
-    <div className="mt-3 space-y-3 rounded-[12px] border border-[var(--border-soft)] bg-white p-4">
-      {/* Progress bar */}
-      <div className="space-y-1">
-        <div className="flex gap-1">
-          {ESCROW_STEPS.map((s, idx) => (
-            <div
-              key={s}
-              className="h-1.5 flex-1 rounded-full transition-colors duration-300"
-              style={{
-                background:
-                  idx < currentIdx
-                    ? 'var(--green)'
-                    : idx === currentIdx
-                    ? 'var(--orange)'
-                    : 'var(--border)',
-              }}
-            />
-          ))}
-        </div>
-        <div className="flex">
-          {ESCROW_STEPS.map((s, idx) => (
-            <div
-              key={s}
-              className="flex-1 text-center text-[9px] font-semibold transition-colors"
-              style={{
-                color:
-                  idx < currentIdx
-                    ? 'var(--green)'
-                    : idx === currentIdx
-                    ? 'var(--orange)'
-                    : 'var(--text-3)',
-              }}
-            >
-              {ESCROW_STEP_LABELS[s]}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Step content */}
-      <div className="space-y-2">
-        {/* ── pickup_code ── */}
-        {releaseMode === 'pickup_code' && step === 'held' && (
-          <>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--orange-border)] bg-[var(--orange-bg)] px-3 py-1 text-[11px] font-semibold text-[var(--orange-dark)]">
-              🔒 Fonds retenus
-            </span>
-            <button
-              type="button"
-              className="btn-secondary mt-2 w-full justify-center"
-              onClick={() => setStep('in_transit')}
-            >
-              Confirmer expédition
-            </button>
-          </>
-        )}
-        {releaseMode === 'pickup_code' && step === 'in_transit' && (
-          <>
-            <label className="block space-y-1">
-              <span className="text-[11px] font-semibold text-[var(--text-2)]">Code de retrait</span>
-              <div className="space-y-1">
-                <input
-                  readOnly
-                  value={pickupCode ?? '482 931'}
-                  className="w-full rounded-[10px] border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-2 text-[14px] font-mono tracking-[0.2em] text-[var(--text-1)]"
-                />
-                {pickupCode !== null ? (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-[var(--orange-border)] bg-[var(--orange-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--orange-dark)]">
-                    🔑 Code réel API
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-3)]">
-                    🎭 Code simulé
-                  </span>
-                )}
-              </div>
-            </label>
-            <button
-              type="button"
-              className="btn-primary w-full justify-center"
-              onClick={() => setStep('delivered')}
-            >
-              Valider le code
-            </button>
-          </>
-        )}
-        {releaseMode === 'pickup_code' && step === 'delivered' && (
-          <button
-            type="button"
-            className="btn-primary w-full justify-center"
-            onClick={() => setStep('released')}
-          >
-            Libérer les fonds
-          </button>
-        )}
-        {releaseMode === 'pickup_code' && step === 'released' && (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--green-border)] bg-[var(--green-bg)] px-3 py-1 text-[11px] font-semibold text-[var(--green)]">
-            ✅ Fonds libérés au marchand
-          </span>
-        )}
-
-        {/* ── auto_timeout ── */}
-        {releaseMode === 'auto_timeout' && step === 'held' && (
-          <>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--orange-border)] bg-[var(--orange-bg)] px-3 py-1 text-[11px] font-semibold text-[var(--orange-dark)]">
-              🔒 Fonds retenus
-            </span>
-            <button
-              type="button"
-              className="btn-secondary mt-2 w-full justify-center"
-              onClick={() => setStep('in_transit')}
-            >
-              Confirmer expédition
-            </button>
-          </>
-        )}
-        {releaseMode === 'auto_timeout' && step === 'in_transit' && (
-          <div className="space-y-2">
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold transition-colors duration-500"
-              style={{
-                borderColor: countdown !== null && countdown <= 3 ? 'var(--green-border)' : 'var(--amber-border)',
-                background: countdown !== null && countdown <= 3 ? 'var(--green-bg)' : 'var(--amber-bg)',
-                color: countdown !== null && countdown <= 3 ? 'var(--green)' : 'var(--amber)',
-              }}
-            >
-              ⏱ Libération automatique dans {countdown ?? 0}s
-            </span>
-            <div className="overflow-hidden rounded-full bg-[var(--bg-subtle)]" style={{ height: 4 }}>
-              <div
-                className="h-full rounded-full bg-[var(--orange)] transition-all duration-1000 ease-linear"
-                style={{ width: `${((countdown ?? 0) / 10) * 100}%` }}
-              />
-            </div>
-            <p className="text-[10px] text-[var(--text-3)]">Simule le timeout de 7 jours en 10 secondes</p>
-          </div>
-        )}
-        {releaseMode === 'auto_timeout' && step === 'delivered' && (
-          <p className="text-[11px] text-[var(--text-2)]">Libération automatique en cours...</p>
-        )}
-        {releaseMode === 'auto_timeout' && step === 'released' && (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--green-border)] bg-[var(--green-bg)] px-3 py-1 text-[11px] font-semibold text-[var(--green)]">
-            ✅ Fonds libérés au marchand
-          </span>
-        )}
-
-        {/* ── dual_confirm ── */}
-        {releaseMode === 'dual_confirm' && step === 'held' && (
-          <button
-            type="button"
-            className="btn-secondary w-full justify-center"
-            onClick={() => setStep('in_transit')}
-          >
-            Confirmer expédition
-          </button>
-        )}
-        {releaseMode === 'dual_confirm' && step === 'in_transit' && (
-          <button
-            type="button"
-            className="btn-primary w-full justify-center"
-            onClick={() => setStep('delivered')}
-          >
-            Confirmer réception
-          </button>
-        )}
-        {releaseMode === 'dual_confirm' && step === 'delivered' && (
-          <button
-            type="button"
-            className="btn-primary w-full justify-center"
-            onClick={() => setStep('released')}
-          >
-            Libérer les fonds
-          </button>
-        )}
-        {releaseMode === 'dual_confirm' && step === 'released' && (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--green-border)] bg-[var(--green-bg)] px-3 py-1 text-[11px] font-semibold text-[var(--green)]">
-            ✅ Fonds libérés au marchand
-          </span>
-        )}
-      </div>
-    </div>
-  )
+  WAVE: {
+    networkLabel: 'WAVE CM',
+    shellBg: '#111A1D',
+    shellBorder: '#12617A',
+    accent: '#00C2FF',
+    keypadBg: '#0F1C22',
+    keypadKeyBg: '#18303A',
+    keypadKeyText: '#CCF3FF',
+    okBg: '#0F4B5C',
+    okText: '#8CF3FF',
+  },
+  MOOV: {
+    networkLabel: 'MOOV CM',
+    shellBg: '#101B13',
+    shellBorder: '#1B6635',
+    accent: '#0DB14B',
+    keypadBg: '#102016',
+    keypadKeyBg: '#1B3525',
+    keypadKeyText: '#D1FFE2',
+    okBg: '#165732',
+    okText: '#A2FFCA',
+  },
 }
 
 export default function WebshopDemoFeature() {
@@ -318,13 +104,7 @@ export default function WebshopDemoFeature() {
   const [apiAuthPin, setApiAuthPin] = useState('')
   const [apiAuthError, setApiAuthError] = useState('')
   const [apiAuthStage, setApiAuthStage] = useState<'auth' | 'confirm' | 'done'>('auth')
-  const [phoneModalMode, setPhoneModalMode] = useState<PhoneModalMode>(null)
   const [configApiKey, setConfigApiKey] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('stpay_api_key') || '' : '')
-  const [checkoutErrors, setCheckoutErrors] = useState<CheckoutErrors>({ name: '', phone: '' })
-  const [escrowEnabled, setEscrowEnabled] = useState(false)
-  const [escrowMode, setEscrowMode] = useState<EscrowMode>('pickup_code')
-  const [escrowStep, setEscrowStep] = useState<EscrowStep>('held')
-  const [pickupCode, setPickupCode] = useState<string | null>(null)
 
   const lines = useMemo<CartLine[]>(() => {
     return demoCatalog
@@ -359,37 +139,6 @@ export default function WebshopDemoFeature() {
     }
   }
 
-  const onPayerNameChange = (value: string) => {
-    setPayerName(value)
-    if (checkoutErrors.name) {
-      setCheckoutErrors((prev) => ({ ...prev, name: '' }))
-    }
-  }
-
-  const onPayerPhoneChange = (value: string) => {
-    setPayerPhone(value)
-    if (checkoutErrors.phone) {
-      setCheckoutErrors((prev) => ({ ...prev, phone: '' }))
-    }
-  }
-
-  const validatePayerDetails = () => {
-    const sanitizedName = payerName.trim()
-    const sanitizedPhone = payerPhone.replace(/\s+/g, '')
-    const nextErrors: CheckoutErrors = { name: '', phone: '' }
-
-    if (!sanitizedName) {
-      nextErrors.name = 'Le nom du payeur est requis.'
-    }
-
-    if (sanitizedPhone.length < 8) {
-      nextErrors.phone = 'Le numero du payeur doit contenir au moins 8 chiffres.'
-    }
-
-    setCheckoutErrors(nextErrors)
-    return !nextErrors.name && !nextErrors.phone
-  }
-
   const removeFromCart = (id: string) => {
     setCart((prev) => {
       const next = { ...prev }
@@ -400,21 +149,20 @@ export default function WebshopDemoFeature() {
     })
   }
 
-  const runCheckoutDemo = async (): Promise<{ started: true; transactionId: string; mode: CheckoutMode } | { started: false }> => {
-    if (!lines.length || status !== 'idle') return { started: false }
-
-    if (!validatePayerDetails()) {
-      setStatusInfo('Nom et numero du payeur requis (numero >= 8 caracteres).')
-      return { started: false }
-    }
+  const runCheckoutDemo = async () => {
+    if (!lines.length || status !== 'idle') return
 
     const sanitizedName = payerName.trim()
     const sanitizedPhone = payerPhone.replace(/\s+/g, '')
+    if (!sanitizedName || sanitizedPhone.length < 8) {
+      setStatusInfo('Nom et numero du payeur requis (numero >= 8 caracteres).')
+      return
+    }
 
     setStatus('creating')
     setStatusInfo('Tentative API live en cours...')
     const generatedTx = `DEMO-${Date.now().toString().slice(-8)}`
-    const baseUrl = import.meta.env.VITE_API_BASE ?? ''
+    const baseUrl = import.meta.env.VITE_API_BASE || 'http://localhost:5169'
     const apiKey = typeof window !== 'undefined' ? localStorage.getItem('stpay_api_key') : null
     const token = typeof window !== 'undefined' ? localStorage.getItem('stpay_token') : null
 
@@ -437,15 +185,6 @@ export default function WebshopDemoFeature() {
         ...(providerNeedsPin ? { pin: widgetPin || '1234' } : {}),
         lines: lines.map((line) => ({ id: line.product.id, qty: line.quantity })),
       },
-      ...(escrowEnabled
-        ? {
-            escrow: {
-              enabled: true,
-              releaseMode: escrowMode,
-              ...(escrowMode === 'auto_timeout' ? { autoTimeoutDays: 7 } : {}),
-            },
-          }
-        : {}),
     }
 
     try {
@@ -464,23 +203,18 @@ export default function WebshopDemoFeature() {
       })
 
       if (response.ok) {
-        const body = await response.json() as {
-          transactionId?: string
-          id?: string
-          escrow?: { escrowId?: string; status?: string; pickupCode?: string }
-        }
+        const body = await response.json() as { transactionId?: string; id?: string }
         const liveTx = body.transactionId || body.id || generatedTx
-        const livePickupCode = body.escrow?.pickupCode ?? null
-        if (livePickupCode) setPickupCode(livePickupCode)
         setMode('live')
         setTxId(liveTx)
-        setStatusInfo(
-          escrowEnabled
-            ? `Transaction creee via API ST Pay (escrow ${escrowMode}).`
-            : 'Transaction creee via API ST Pay.',
-        )
+        setStatusInfo('Transaction creee via API ST Pay.')
         setStatus('pending')
-        return { started: true, transactionId: liveTx, mode: 'live' }
+        // Ouvrir modal d'auth pour Mode B
+        setApiAuthOpen(true)
+        setApiAuthPin('')
+        setApiAuthError('')
+        setApiAuthStage('auth')
+        return
       }
 
       const statusCode = response.status
@@ -497,36 +231,11 @@ export default function WebshopDemoFeature() {
     setMode('simulated')
     setTxId(generatedTx)
     setStatus('pending')
-    return { started: true, transactionId: generatedTx, mode: 'simulated' }
-  }
-
-  const triggerOrangePush = async (paymentId: string) => {
-    const baseUrl = import.meta.env.VITE_API_BASE ?? ''
-    const apiKey = typeof window !== 'undefined' ? localStorage.getItem('stpay_api_key') : null
-    const token = typeof window !== 'undefined' ? localStorage.getItem('stpay_token') : null
-
-    const response = await fetch(`${baseUrl}/api/Payment/${encodeURIComponent(paymentId)}/push`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(apiKey ? { 'X-Api-Key': apiKey } : {}),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    })
-
-    if (!response.ok) {
-      throw new Error(`Push Orange échoué (${response.status})`)
-    }
-  }
-  const openApiAuth = () => {
-    if (!lines.length || status !== 'idle') return
-    setCheckoutErrors({ name: '', phone: '' })
+    setApiAuthOpen(true)
     setApiAuthPin('')
     setApiAuthError('')
     setApiAuthStage('auth')
-    setApiAuthOpen(true)
   }
-
 
   const resetDemo = () => {
     setStatus('idle')
@@ -540,36 +249,18 @@ export default function WebshopDemoFeature() {
     setApiAuthPin('')
     setApiAuthError('')
     setApiAuthStage('auth')
-    setPhoneModalMode(null)
-    setEscrowStep('held')
-    setPickupCode(null)
   }
 
   const openWidget = () => {
     if (!lines.length) return
     setWidgetOpen(true)
-    setCheckoutErrors({ name: '', phone: '' })
     setWidgetPin('')
     setPinError('')
     setWidgetStage(status === 'success' ? 'done' : 'cart')
   }
 
-  const openPhysicalPhone = (mode: Exclude<PhoneModalMode, null>) => {
-    setPhoneModalMode(mode)
-  }
-
-  const closePhysicalPhone = () => {
-    if (apiAuthStage === 'confirm') return
-    setPhoneModalMode(null)
-  }
-
   const advanceWidget = () => {
-    if (widgetStage === 'cart') {
-      if (!validatePayerDetails()) {
-        return
-      }
-      setWidgetStage('auth')
-    }
+    if (widgetStage === 'cart') setWidgetStage('auth')
     else if (widgetStage === 'auth') {
       if (providerNeedsPin && widgetPin.length < 4) {
         setPinError('PIN requis (min 4 chiffres).')
@@ -619,29 +310,7 @@ export default function WebshopDemoFeature() {
       setApiAuthError('PIN requis (min 4 chiffres).')
       return
     }
-
-    let currentMode = mode
-    let currentTxId = txId
-
-    if (status === 'idle') {
-      const startResult = await runCheckoutDemo()
-      if (!startResult.started) return
-      currentMode = startResult.mode
-      currentTxId = startResult.transactionId
-    }
-
-    if (provider === 'ORANGE' && currentMode === 'live' && currentTxId) {
-      try {
-        await triggerOrangePush(currentTxId)
-        setStatusInfo('Push Orange envoyé. Confirmation mobile en cours...')
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Push Orange non disponible'
-        setStatusInfo(`${message}. Poursuite de la simulation d\'autorisation.`)
-      }
-    }
-
     setApiAuthError('')
-    setPhoneModalMode(null)
     setApiAuthStage('confirm')
     // Simulation de confirmation
     await new Promise((r) => setTimeout(r, 1500))
@@ -657,30 +326,12 @@ export default function WebshopDemoFeature() {
   const closeApiAuthModal = () => {
     if (apiAuthStage === 'confirm') return
     setApiAuthOpen(false)
-    setPhoneModalMode(null)
   }
 
   const launchFromWidget = async () => {
     if (status !== 'idle') return
     await runCheckoutDemo()
   }
-
-  const submitWidgetPhoneAuth = () => {
-    if (widgetStage !== 'auth') return
-    if (providerNeedsPin && widgetPin.length < 4) {
-      setPinError('PIN requis (min 4 chiffres).')
-      return
-    }
-    setPhoneModalMode(null)
-    advanceWidget()
-  }
-
-  const phoneModalTitle = phoneModalMode === 'api' ? 'Téléphone du client' : 'Téléphone physique'
-  const phonePinValue = phoneModalMode === 'api' ? apiAuthPin : widgetPin
-  const phonePinError = phoneModalMode === 'api' ? apiAuthError : pinError
-  const phoneInstruction = providerNeedsPin
-    ? 'Saisissez votre PIN (4 chiffres) puis OK'
-    : 'Validation sans PIN'
 
   const payloadPreview = {
     amount: total,
@@ -700,18 +351,9 @@ export default function WebshopDemoFeature() {
       ...(providerNeedsPin ? { pin: widgetPin || '1234' } : {}),
       lines: lines.map((line) => ({ id: line.product.id, qty: line.quantity })),
     },
-    ...(escrowEnabled
-      ? {
-          escrow: {
-            enabled: true,
-            releaseMode: escrowMode,
-            ...(escrowMode === 'auto_timeout' ? { autoTimeoutDays: 7 } : {}),
-          },
-        }
-      : {}),
   }
 
-  const sdkSnippet = `<script src=\"https://cdn.stpay.africa/web-sdk.js\"></script>\n<button id=\"stpay-btn\">Payer avec ST Pay</button>\n<script>\n  const stpay = new STPay({ publicKey: 'pk_test_xxx' });\n\n  document.getElementById('stpay-btn').onclick = () => {\n    stpay.checkout({\n      amount: ${total},\n      currency: 'XAF',\n      provider: '${provider}',\n      customer: { phoneNumber: '${payerPhone}', name: '${payerName}' },\n      merchant: { reference: 'WEBSHOP-DEMO-001' },\n      metadata: { source: 'public-webshop-demo' }${escrowEnabled ? `,\n      escrow: { enabled: true, releaseMode: '${escrowMode}'${escrowMode === 'auto_timeout' ? ', autoTimeoutDays: 7' : ''} }` : ''}\n    });\n  };\n</script>`
+  const sdkSnippet = `<script src=\"https://cdn.stpay.africa/web-sdk.js\"></script>\n<button id=\"stpay-btn\">Payer avec ST Pay</button>\n<script>\n  const stpay = new STPay({ publicKey: 'pk_test_xxx' });\n\n  document.getElementById('stpay-btn').onclick = () => {\n    stpay.checkout({\n      amount: ${total},\n      currency: 'XAF',\n      provider: '${provider}',\n      customer: { phoneNumber: '${payerPhone}', name: '${payerName}' },\n      merchant: { reference: 'WEBSHOP-DEMO-001' },\n      metadata: { source: 'public-webshop-demo' }\n    });\n  };\n</script>`
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,#FFF1E8_0%,#F5F4F0_35%,#EEF4FF_100%)] px-4 py-8">
@@ -855,6 +497,34 @@ export default function WebshopDemoFeature() {
                   <div className="flex justify-between"><span className="text-[var(--text-2)]">Frais ST Pay (1.5%)</span><strong>{fmtXaf(fee)}</strong></div>
                   <div className="mt-1 flex justify-between text-[14px]"><span className="font-bold">Total</span><strong>{fmtXaf(total)}</strong></div>
                 </div>
+
+                <label className="space-y-1">
+                  <span className="text-[11px] font-semibold text-[var(--text-2)]">Nom du payeur</span>
+                  <input
+                    className="sp-input"
+                    value={payerName}
+                    onChange={(e) => setPayerName(e.target.value)}
+                    placeholder="Ex: Jean Dupont"
+                  />
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-[11px] font-semibold text-[var(--text-2)]">Numero du payeur (compte)</span>
+                  <input
+                    className="sp-input"
+                    value={payerPhone}
+                    onChange={(e) => setPayerPhone(e.target.value)}
+                    placeholder="Ex: 237677123456"
+                    inputMode="tel"
+                  />
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-[11px] font-semibold text-[var(--text-2)]">Provider mobile money</span>
+                  <select className="sp-input" value={provider} onChange={(e) => setProvider(e.target.value)}>
+                    {demoProviders.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </select>
+                </label>
               </div>
             </div>
             </>
@@ -886,65 +556,42 @@ export default function WebshopDemoFeature() {
                   <div className="mt-1 flex justify-between text-[14px]"><span className="font-bold">Total</span><strong>{fmtXaf(total)}</strong></div>
                 </div>
 
+                <label className="space-y-1">
+                  <span className="text-[11px] font-semibold text-[var(--text-2)]">Nom du payeur</span>
+                  <input
+                    className="sp-input"
+                    value={payerName}
+                    onChange={(e) => setPayerName(e.target.value)}
+                    placeholder="Ex: Jean Dupont"
+                  />
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-[11px] font-semibold text-[var(--text-2)]">Numero du payeur (compte)</span>
+                  <input
+                    className="sp-input"
+                    value={payerPhone}
+                    onChange={(e) => setPayerPhone(e.target.value)}
+                    placeholder="Ex: 237677123456"
+                    inputMode="tel"
+                  />
+                </label>
+
+                <label className="space-y-1">
+                  <span className="text-[11px] font-semibold text-[var(--text-2)]">Provider mobile money</span>
+                  <select className="sp-input" value={provider} onChange={(e) => setProvider(e.target.value)}>
+                    {demoProviders.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </select>
+                </label>
+
                 <div className="rounded-[10px] border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-3 text-[11px] text-[var(--text-2)]">
                   <p className="font-semibold">💳 Mode B - Checkout API: Crée une VRAIE transaction sur votre backend ST Pay</p>
                   <p className="mt-1.5 text-[10px] leading-relaxed">Le bouton envoie les données du panier à votre API ST Pay (http://localhost:5169/api/Payment). Ce mode teste l'intégration API réelle avec votre backend.</p>
                 </div>
 
-                <div className="rounded-[10px] border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[11px] font-semibold text-[var(--text-1)]">Activer l'escrow</p>
-                    <button
-                      type="button"
-                      onClick={() => setEscrowEnabled((prev) => !prev)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        escrowEnabled ? 'bg-[var(--orange)]' : 'bg-[var(--border-med)]'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                          escrowEnabled ? 'translate-x-5' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
-
-                  {escrowEnabled && (
-                    <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-3">
-                      {[
-                        { value: 'pickup_code', label: 'Code retrait' },
-                        { value: 'auto_timeout', label: 'Timeout auto' },
-                        { value: 'dual_confirm', label: 'Double confirm' },
-                      ].map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          className={`rounded-[8px] border px-2 py-1.5 text-[11px] font-semibold ${
-                            escrowMode === option.value
-                              ? 'border-[var(--orange-border)] bg-[var(--orange-bg)] text-[var(--orange-dark)]'
-                              : 'border-[var(--border)] bg-white text-[var(--text-2)]'
-                          }`}
-                          onClick={() => setEscrowMode(option.value as EscrowMode)}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {escrowEnabled ? (
-                    <p className="mt-2 text-[10px] text-[var(--text-2)]">
-                      Escrow actif: mode <strong>{escrowMode}</strong>
-                      {escrowMode === 'auto_timeout' ? ' (7 jours)' : ''}
-                    </p>
-                  ) : (
-                    <p className="mt-2 text-[10px] text-[var(--text-3)]">Escrow inactif pour ce checkout.</p>
-                  )}
-                </div>
-
                 <div className="flex gap-2">
-                  <button type="button" className="btn-primary flex-1 justify-center" onClick={openApiAuth} disabled={!lines.length || status !== 'idle'}>
-                    {status === 'idle' && 'Payer avec ST Pay'}
+                  <button type="button" className="btn-primary flex-1 justify-center" onClick={runCheckoutDemo} disabled={!lines.length || status !== 'idle'}>
+                    {status === 'idle' && 'Lancer paiement API (simulation)'}
                     {status === 'creating' && 'Creation transaction API...'}
                     {status === 'pending' && 'Autorisation mobile en attente...'}
                     {status === 'success' && 'Paiement confirme'}
@@ -955,7 +602,7 @@ export default function WebshopDemoFeature() {
                 <div className="rounded-[10px] border border-[var(--orange-border)] bg-[var(--orange-bg)] p-3">
                   <p className="text-[11px] font-bold text-[var(--orange-dark)]">Etat checkout</p>
                   <p className="mt-1 text-[12px] text-[var(--text-2)]">
-                    {status === 'idle' && 'Pret: panier compose. L\'operateur est choisi dans le widget ST Pay.'}
+                    {status === 'idle' && 'Pret: panier compose et provider selectionne.'}
                     {status === 'creating' && 'Creation transaction ST Pay...'}
                     {status === 'pending' && 'Transaction en attente de confirmation mobile.'}
                     {status === 'success' && `Paiement confirme (${txId}) via mode ${mode}.`}
@@ -966,14 +613,6 @@ export default function WebshopDemoFeature() {
                     </button>
                   )}
                   {statusInfo && <p className="mt-2 text-[11px] text-[var(--text-2)]">{statusInfo}</p>}
-                  {status === 'success' && escrowEnabled && (
-                    <EscrowLifecycleStepper
-                      step={escrowStep}
-                      setStep={setEscrowStep}
-                      releaseMode={escrowMode}
-                      pickupCode={pickupCode}
-                    />
-                  )}
                 </div>
               </div>
             </div>
@@ -996,23 +635,15 @@ export default function WebshopDemoFeature() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4" onClick={() => setWidgetOpen(false)}>
           <div className="w-full max-w-md rounded-[16px] border border-[var(--border)] bg-white p-5 shadow-[0_24px_70px_rgba(0,0,0,0.28)]" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[var(--orange)] text-[15px] font-extrabold text-white">ST</div>
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--orange)]">Interface ST Pay</p>
-                  <h3 className="text-[18px] font-extrabold text-[var(--text-1)]">Confirmation Paiement</h3>
-                  <p className="text-[11px] text-[var(--text-3)]">Paiement sécurisé et hébergé par ST Pay, pas par le marchand.</p>
-                </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--orange)]">ST Pay Widget</p>
+                <h3 className="text-[18px] font-extrabold text-[var(--text-1)]">Checkout Demo</h3>
               </div>
               <button className="btn-ghost" type="button" onClick={() => setWidgetOpen(false)}>Fermer</button>
             </div>
 
             <div className="mb-4 rounded-[10px] border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 py-2.5">
-              <div className="grid grid-cols-2 gap-2 text-[11px] md:grid-cols-4">
-                <div>
-                  <p className="text-[var(--text-3)]">Montant</p>
-                  <p className="font-semibold text-[var(--text-1)]">{fmtXaf(total)}</p>
-                </div>
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
                 <div>
                   <p className="text-[var(--text-3)]">Payeur</p>
                   <p className="font-semibold text-[var(--text-1)]">{payerName || 'N/A'}</p>
@@ -1020,10 +651,6 @@ export default function WebshopDemoFeature() {
                 <div>
                   <p className="text-[var(--text-3)]">Compte</p>
                   <p className="font-semibold text-[var(--text-1)]">{payerPhone || 'N/A'}</p>
-                </div>
-                <div>
-                  <p className="text-[var(--text-3)]">Operateur</p>
-                  <p className="font-semibold text-[var(--text-1)]">{provider}</p>
                 </div>
               </div>
             </div>
@@ -1041,70 +668,55 @@ export default function WebshopDemoFeature() {
             </div>
 
             <div className="space-y-3 rounded-[12px] border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-4">
-              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--green-border)] bg-[var(--green-bg)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--green)]">
-                Checkout sécurisé ST Pay
-              </div>
-              {widgetStage === 'cart' && (
-                <div className="space-y-3">
-                  <div className="rounded-[12px] border border-[var(--blue-border)] bg-[var(--blue-bg)] px-3 py-2.5 text-[11px] font-semibold text-[var(--blue)]">
-                    Vous êtes dans la fenêtre de paiement ST Pay. Vérifiez les informations du payeur avant de continuer.
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="space-y-1">
-                      <span className="text-[11px] font-semibold text-[var(--text-2)]">Nom du payeur</span>
-                      <input
-                        className={`w-full rounded-[10px] border px-3 py-2 text-[13px] outline-none transition focus:border-[var(--orange)] ${checkoutErrors.name ? 'border-[var(--red)] bg-[var(--red-bg)]' : 'border-[var(--border)] bg-white'}`}
-                        value={payerName}
-                        onChange={(e) => onPayerNameChange(e.target.value)}
-                        placeholder="Ex: Jean Dupont"
-                      />
-                      {checkoutErrors.name ? <span className="text-[11px] font-medium text-[var(--red)]">{checkoutErrors.name}</span> : null}
-                    </label>
-                    <label className="space-y-1">
-                      <span className="text-[11px] font-semibold text-[var(--text-2)]">Numero du payeur (compte)</span>
-                      <input
-                        className={`w-full rounded-[10px] border px-3 py-2 text-[13px] outline-none transition focus:border-[var(--orange)] ${checkoutErrors.phone ? 'border-[var(--red)] bg-[var(--red-bg)]' : 'border-[var(--border)] bg-white'}`}
-                        value={payerPhone}
-                        onChange={(e) => onPayerPhoneChange(e.target.value)}
-                        placeholder="Ex: 237677123456"
-                        inputMode="tel"
-                      />
-                      {checkoutErrors.phone ? <span className="text-[11px] font-medium text-[var(--red)]">{checkoutErrors.phone}</span> : null}
-                    </label>
-                  </div>
-                  <div className="space-y-1.5">
-                    <p className="text-[11px] font-semibold text-[var(--text-2)]">Choisissez votre opérateur mobile money</p>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {demoProviders.map((p) => {
-                        const active = provider === p.value
-                        return (
-                          <button
-                            key={p.value}
-                            type="button"
-                            className={`rounded-[8px] border px-2.5 py-1.5 text-[11px] font-semibold transition-colors ${active ? 'border-[var(--orange-border)] bg-[var(--orange-bg)] text-[var(--orange-dark)]' : 'border-[var(--border)] bg-white text-[var(--text-2)] hover:text-[var(--text-1)]'}`}
-                            onClick={() => setProvider(p.value)}
-                          >
-                            {p.label}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
               {widgetStage === 'cart' && <p className="text-[12px] text-[var(--text-2)]">Validation du panier: {fmtXaf(total)} avec {provider}.</p>}
               {widgetStage === 'auth' && (
                 <div className="space-y-3">
-                  <div className="rounded-[12px] border border-[var(--amber-border)] bg-[var(--amber-bg)] px-3 py-2.5 text-[11px] font-semibold text-[var(--amber)]">
-                    Aucune saisie sensible ici. Le PIN est saisi uniquement sur le téléphone du client.
-                  </div>
                   <p className="text-[12px] text-[var(--text-2)]">Auth mobile sur telephone client ({provider}).</p>
-                  <div className="rounded-[12px] border border-[var(--border)] bg-white p-3 text-[12px] text-[var(--text-2)]">
-                    Le client doit saisir son PIN sur son téléphone physique, pas dans l'interface web.
+                  <div
+                    className="mx-auto w-full max-w-[220px] rounded-[16px] p-3 shadow-[0_10px_24px_rgba(0,0,0,0.35)]"
+                    style={{
+                      border: `1px solid ${phoneTheme.shellBorder}`,
+                      background: phoneTheme.shellBg,
+                      boxShadow: `0 0 0 1px ${phoneTheme.accent}33, 0 10px 24px rgba(0,0,0,0.35)`,
+                    }}
+                  >
+                    <div className="mb-2 flex items-center justify-between px-1 font-mono text-[9px] text-[#E5E7EB]">
+                      <span>{phoneTheme.networkLabel}</span>
+                      <span>4G</span>
+                    </div>
+                    <div className="mb-2 rounded-[10px] border border-[#2A2A2A] bg-black p-3 text-center font-mono text-[11px] text-[#F5F5F5]">
+                      <div className="mb-1 text-[10px] text-[#9CA3AF]">{providerNeedsPin ? 'Saisissez votre PIN (4 chiffres) puis OK' : 'Validation sans PIN'}</div>
+                      <div className="mb-1 text-[10px] text-[#9CA3AF]">Payeur: {payerName || 'N/A'}</div>
+                      <div className="mb-1 text-[10px] text-[#9CA3AF]">Compte: {payerPhone || 'N/A'}</div>
+                      <div className="rounded px-2 py-2 text-[16px] tracking-[0.35em]" style={{ background: `${phoneTheme.accent}22`, border: `1px solid ${phoneTheme.accent}55` }}>
+                        {providerNeedsPin ? (widgetPin ? '•'.repeat(widgetPin.length) : '_ _ _ _') : 'OK'}
+                      </div>
+                      <div className="mt-2 text-[10px] text-[#9CA3AF]">Montant: {fmtXaf(total)}</div>
+                    </div>
+
+                    {providerNeedsPin ? (
+                      <div className="grid grid-cols-3 gap-1.5" style={{ background: phoneTheme.keypadBg, padding: 4, borderRadius: 10 }}>
+                        {['1','2','3','4','5','6','7','8','9'].map((digit) => (
+                          <button
+                            key={digit}
+                            type="button"
+                            className="rounded-[8px] py-1.5 text-[12px] font-semibold"
+                            style={{ background: phoneTheme.keypadKeyBg, color: phoneTheme.keypadKeyText }}
+                            onClick={() => dialPin(digit)}
+                          >
+                            {digit}
+                          </button>
+                        ))}
+                        <button type="button" className="rounded-[8px] bg-[#3D2B18] py-1.5 text-[11px] font-semibold text-[#FBBF24]" onClick={deletePin}>⌫</button>
+                        <button type="button" className="rounded-[8px] py-1.5 text-[12px] font-semibold" style={{ background: phoneTheme.keypadKeyBg, color: phoneTheme.keypadKeyText }} onClick={() => dialPin('0')}>0</button>
+                        <button type="button" className="rounded-[8px] py-1.5 text-[11px] font-semibold" style={{ background: phoneTheme.okBg, color: phoneTheme.okText }} onClick={advanceWidget}>OK</button>
+                      </div>
+                    ) : (
+                      <button type="button" className="w-full rounded-[8px] py-2 text-[12px] font-semibold" style={{ background: phoneTheme.okBg, color: phoneTheme.okText }} onClick={advanceWidget}>
+                        Autoriser
+                      </button>
+                    )}
                   </div>
-                  <button type="button" className="btn-primary w-full justify-center" onClick={() => openPhysicalPhone('widget')}>
-                    Ouvrir la simulation du téléphone
-                  </button>
                   {pinError && <p className="text-[11px] font-semibold text-[var(--red)]">{pinError}</p>}
                 </div>
               )}
@@ -1122,7 +734,7 @@ export default function WebshopDemoFeature() {
                       <p className="text-[12px] font-semibold" style={{ color: phoneTheme.accent }}>
                         {status === 'creating' ? 'Creation transaction ST Pay...' : 'Validation mobile en cours...'}
                       </p>
-                      <p className="text-[11px] text-[var(--text-3)]">Operateur: {provider}</p>
+                      <p className="text-[11px] text-[var(--text-3)]">Provider: {provider}</p>
                     </>
                   )}
                 </div>
@@ -1153,13 +765,9 @@ export default function WebshopDemoFeature() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4" onClick={closeApiAuthModal}>
           <div className="w-full max-w-md rounded-[16px] border border-[var(--border)] bg-white p-5 shadow-[0_24px_70px_rgba(0,0,0,0.28)]" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[var(--orange)] text-[15px] font-extrabold text-white">ST</div>
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--orange)]">ST Pay Checkout API</p>
-                  <h3 className="text-[18px] font-extrabold text-[var(--text-1)]">Confirmation Paiement</h3>
-                  <p className="text-[11px] text-[var(--text-3)]">Cette fenêtre de paiement est fournie par ST Pay, pas par le marchand.</p>
-                </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--orange)]">Mode B - Autorisation Mobile</p>
+                <h3 className="text-[18px] font-extrabold text-[var(--text-1)]">Confirmation Paiement</h3>
               </div>
               <button className="btn-ghost" type="button" onClick={closeApiAuthModal} disabled={apiAuthStage === 'confirm'}>
                 {apiAuthStage === 'confirm' ? 'Traitement...' : 'Fermer'}
@@ -1173,69 +781,59 @@ export default function WebshopDemoFeature() {
                   <p className="font-semibold text-[var(--text-1)]">{fmtXaf(total)}</p>
                 </div>
                 <div>
-                  <p className="text-[var(--text-3)]">Operateur</p>
+                  <p className="text-[var(--text-3)]">Provider</p>
                   <p className="font-semibold text-[var(--text-1)]">{provider}</p>
                 </div>
               </div>
             </div>
 
             <div className="space-y-3 rounded-[12px] border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-4">
-              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--green-border)] bg-[var(--green-bg)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[var(--green)]">
-                Checkout sécurisé ST Pay
-              </div>
               {apiAuthStage === 'auth' && (
                 <div className="space-y-3">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="space-y-1">
-                      <span className="text-[11px] font-semibold text-[var(--text-2)]">Nom du payeur</span>
-                      <input
-                        className={`w-full rounded-[10px] border px-3 py-2 text-[13px] outline-none transition focus:border-[var(--orange)] ${checkoutErrors.name ? 'border-[var(--red)] bg-[var(--red-bg)]' : 'border-[var(--border)] bg-white'}`}
-                        value={payerName}
-                        onChange={(e) => onPayerNameChange(e.target.value)}
-                        placeholder="Ex: Jean Dupont"
-                      />
-                      {checkoutErrors.name ? <span className="text-[11px] font-medium text-[var(--red)]">{checkoutErrors.name}</span> : null}
-                    </label>
-                    <label className="space-y-1">
-                      <span className="text-[11px] font-semibold text-[var(--text-2)]">Numero du payeur (compte)</span>
-                      <input
-                        className={`w-full rounded-[10px] border px-3 py-2 text-[13px] outline-none transition focus:border-[var(--orange)] ${checkoutErrors.phone ? 'border-[var(--red)] bg-[var(--red-bg)]' : 'border-[var(--border)] bg-white'}`}
-                        value={payerPhone}
-                        onChange={(e) => onPayerPhoneChange(e.target.value)}
-                        placeholder="Ex: 237677123456"
-                        inputMode="tel"
-                      />
-                      {checkoutErrors.phone ? <span className="text-[11px] font-medium text-[var(--red)]">{checkoutErrors.phone}</span> : null}
-                    </label>
-                  </div>
-                  <div className="rounded-[12px] border border-[var(--amber-border)] bg-[var(--amber-bg)] px-3 py-2.5 text-[11px] font-semibold text-[var(--amber)]">
-                    Aucune saisie sensible ici. Le PIN est saisi uniquement sur le téléphone du client.
-                  </div>
                   <p className="text-[12px] text-[var(--text-2)]">Le client doit autoriser le paiement sur son téléphone.</p>
-                  <div className="space-y-1.5">
-                    <p className="text-[11px] font-semibold text-[var(--text-2)]">Choisissez votre opérateur mobile money</p>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {demoProviders.map((p) => {
-                        const active = provider === p.value
-                        return (
-                          <button
-                            key={p.value}
-                            type="button"
-                            className={`rounded-[8px] border px-2.5 py-1.5 text-[11px] font-semibold transition-colors ${active ? 'border-[var(--orange-border)] bg-[var(--orange-bg)] text-[var(--orange-dark)]' : 'border-[var(--border)] bg-white text-[var(--text-2)] hover:text-[var(--text-1)]'}`}
-                            onClick={() => setProvider(p.value)}
-                          >
-                            {p.label}
-                          </button>
-                        )
-                      })}
+                  <div
+                    className="mx-auto w-full max-w-[220px] rounded-[16px] p-3 shadow-[0_10px_24px_rgba(0,0,0,0.35)]"
+                    style={{
+                      border: `1px solid ${phoneTheme.shellBorder}`,
+                      background: phoneTheme.shellBg,
+                      boxShadow: `0 0 0 1px ${phoneTheme.accent}33, 0 10px 24px rgba(0,0,0,0.35)`,
+                    }}
+                  >
+                    <div className="mb-2 flex items-center justify-between px-1 font-mono text-[9px] text-[#E5E7EB]">
+                      <span>{phoneTheme.networkLabel}</span>
+                      <span>4G</span>
                     </div>
+                    <div className="mb-2 rounded-[10px] border border-[#2A2A2A] bg-black p-3 text-center font-mono text-[11px] text-[#F5F5F5]">
+                      <div className="mb-1 text-[10px] text-[#9CA3AF]">{providerNeedsPin ? 'Saisissez votre PIN (4 chiffres) puis OK' : 'Validation sans PIN'}</div>
+                      <div className="mb-1 text-[10px] text-[#9CA3AF]">Montant: {fmtXaf(total)}</div>
+                      <div className="rounded px-2 py-2 text-[16px] tracking-[0.35em]" style={{ background: `${phoneTheme.accent}22`, border: `1px solid ${phoneTheme.accent}55` }}>
+                        {providerNeedsPin ? (apiAuthPin ? '•'.repeat(apiAuthPin.length) : '_ _ _ _') : 'OK'}
+                      </div>
+                    </div>
+
+                    {providerNeedsPin ? (
+                      <div className="grid grid-cols-3 gap-1.5" style={{ background: phoneTheme.keypadBg, padding: 4, borderRadius: 10 }}>
+                        {['1','2','3','4','5','6','7','8','9'].map((digit) => (
+                          <button
+                            key={digit}
+                            type="button"
+                            className="rounded-[8px] py-1.5 text-[12px] font-semibold"
+                            style={{ background: phoneTheme.keypadKeyBg, color: phoneTheme.keypadKeyText }}
+                            onClick={() => dialApiAuthPin(digit)}
+                          >
+                            {digit}
+                          </button>
+                        ))}
+                        <button type="button" className="rounded-[8px] bg-[#3D2B18] py-1.5 text-[11px] font-semibold text-[#FBBF24]" onClick={deleteApiAuthPin}>⌫</button>
+                        <button type="button" className="rounded-[8px] py-1.5 text-[12px] font-semibold" style={{ background: phoneTheme.keypadKeyBg, color: phoneTheme.keypadKeyText }} onClick={() => dialApiAuthPin('0')}>0</button>
+                        <button type="button" className="rounded-[8px] py-1.5 text-[11px] font-semibold" style={{ background: phoneTheme.okBg, color: phoneTheme.okText }} onClick={confirmApiAuth}>OK</button>
+                      </div>
+                    ) : (
+                      <button type="button" className="w-full rounded-[8px] py-2 text-[12px] font-semibold" style={{ background: phoneTheme.okBg, color: phoneTheme.okText }} onClick={confirmApiAuth}>
+                        Autoriser
+                      </button>
+                    )}
                   </div>
-                  <div className="rounded-[12px] border border-[var(--border)] bg-white p-3 text-[12px] text-[var(--text-2)]">
-                    Le PIN doit être saisi sur le téléphone du client. La fenêtre web ne fait qu'afficher l'état du parcours.
-                  </div>
-                  <button type="button" className="btn-primary w-full justify-center" onClick={() => openPhysicalPhone('api')}>
-                    Ouvrir la simulation du téléphone
-                  </button>
                   {apiAuthError && <p className="text-[11px] font-semibold text-[var(--red)]">{apiAuthError}</p>}
                 </div>
               )}
@@ -1248,7 +846,7 @@ export default function WebshopDemoFeature() {
                   <p className="text-[12px] font-semibold" style={{ color: phoneTheme.accent }}>
                     Confirmation du paiement en cours...
                   </p>
-                  <p className="text-[11px] text-[var(--text-3)]">Operateur: {provider}</p>
+                  <p className="text-[11px] text-[var(--text-3)]">Provider: {provider}</p>
                 </div>
               )}
               {apiAuthStage === 'done' && (
@@ -1261,93 +859,6 @@ export default function WebshopDemoFeature() {
                 <button className="btn-primary flex-1 justify-center" type="button" onClick={closeApiAuthModal}>Terminer</button>
               )}
             </div>
-          </div>
-        </div>
-      )}
-
-      {phoneModalMode && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 px-4" onClick={closePhysicalPhone}>
-          <div className="w-full max-w-[280px]" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between rounded-[14px] border border-[var(--border)] bg-white px-4 py-3 shadow-[0_18px_45px_rgba(0,0,0,0.18)]">
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--orange)]">Simulation téléphone</p>
-                <p className="text-[13px] font-semibold text-[var(--text-1)]">{phoneModalTitle}</p>
-              </div>
-              <button className="btn-ghost" type="button" onClick={closePhysicalPhone}>Fermer</button>
-            </div>
-
-            <div
-              className="mx-auto w-full max-w-[220px] rounded-[16px] p-3 shadow-[0_10px_24px_rgba(0,0,0,0.35)]"
-              style={{
-                border: `1px solid ${phoneTheme.shellBorder}`,
-                background: phoneTheme.shellBg,
-                boxShadow: `0 0 0 1px ${phoneTheme.accent}33, 0 10px 24px rgba(0,0,0,0.35)`,
-              }}
-            >
-              <div className="mb-2 flex items-center justify-between px-1 font-mono text-[9px] text-[#E5E7EB]">
-                <span>{phoneTheme.networkLabel}</span>
-                <span>4G</span>
-              </div>
-              <div className="mb-2 rounded-[10px] border border-[#2A2A2A] bg-black p-3 text-center font-mono text-[11px] text-[#F5F5F5]">
-                <div className="mb-1 text-[10px] text-[#9CA3AF]">{phoneInstruction}</div>
-                {phoneModalMode === 'widget' ? <div className="mb-1 text-[10px] text-[#9CA3AF]">Payeur: {payerName || 'N/A'}</div> : null}
-                {phoneModalMode === 'widget' ? <div className="mb-1 text-[10px] text-[#9CA3AF]">Compte: {payerPhone || 'N/A'}</div> : null}
-                <div className="mb-1 text-[10px] text-[#9CA3AF]">Montant: {fmtXaf(total)}</div>
-                <div className="rounded px-2 py-2 text-[16px] tracking-[0.35em]" style={{ background: `${phoneTheme.accent}22`, border: `1px solid ${phoneTheme.accent}55` }}>
-                  {providerNeedsPin ? (phonePinValue ? '•'.repeat(phonePinValue.length) : '_ _ _ _') : 'OK'}
-                </div>
-              </div>
-
-              {providerNeedsPin ? (
-                <div className="grid grid-cols-3 gap-1.5" style={{ background: phoneTheme.keypadBg, padding: 4, borderRadius: 10 }}>
-                  {['1','2','3','4','5','6','7','8','9'].map((digit) => (
-                    <button
-                      key={digit}
-                      type="button"
-                      className="rounded-[8px] py-1.5 text-[12px] font-semibold"
-                      style={{ background: phoneTheme.keypadKeyBg, color: phoneTheme.keypadKeyText }}
-                      onClick={() => phoneModalMode === 'api' ? dialApiAuthPin(digit) : dialPin(digit)}
-                    >
-                      {digit}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    className="rounded-[8px] bg-[#3D2B18] py-1.5 text-[11px] font-semibold text-[#FBBF24]"
-                    onClick={() => phoneModalMode === 'api' ? deleteApiAuthPin() : deletePin()}
-                  >
-                    ⌫
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-[8px] py-1.5 text-[12px] font-semibold"
-                    style={{ background: phoneTheme.keypadKeyBg, color: phoneTheme.keypadKeyText }}
-                    onClick={() => phoneModalMode === 'api' ? dialApiAuthPin('0') : dialPin('0')}
-                  >
-                    0
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-[8px] py-1.5 text-[11px] font-semibold"
-                    style={{ background: phoneTheme.okBg, color: phoneTheme.okText }}
-                    onClick={() => phoneModalMode === 'api' ? void confirmApiAuth() : submitWidgetPhoneAuth()}
-                  >
-                    OK
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className="w-full rounded-[8px] py-2 text-[12px] font-semibold"
-                  style={{ background: phoneTheme.okBg, color: phoneTheme.okText }}
-                  onClick={() => phoneModalMode === 'api' ? void confirmApiAuth() : submitWidgetPhoneAuth()}
-                >
-                  Autoriser
-                </button>
-              )}
-            </div>
-
-            {phonePinError ? <p className="mt-3 text-center text-[11px] font-semibold text-white">{phonePinError}</p> : null}
           </div>
         </div>
       )}

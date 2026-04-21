@@ -42,6 +42,8 @@ type PhoneScreen = 'idle' | 'ussd' | 'processing' | 'success' | 'failed' | 'canc
 interface PaymentForm {
   amount: number; phone: string; name: string; ref: string; description: string
   scenario: 'success' | 'failure' | 'timeout'
+  provider: 'MTN' | 'ORANGE'
+  orangePin: string
 }
 
 interface LogEntry { time: string; message: string; type: 'info' | 'ok' | 'err' | 'warn' }
@@ -934,11 +936,33 @@ function KeysTab() {
 
   // ── Rotate confirm ──
   const [rotatingId, setRotatingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const { data: apps = [], isLoading } = useQuery({
     queryKey: ['merchant-apps'],
     queryFn: appsApi.list,
   })
+
+  // Auto-provision: create a default test app if the merchant has none
+  const autoProvisionFired = useRef(false)
+  const autoProvision = useMutation({
+    mutationFn: () => appsApi.create({
+      name: `${user.name} (Test)`,
+      description: "Application de test créée automatiquement à l'inscription.",
+      isTestMode: true,
+    }),
+    onSuccess: (data: CreateAppResult) => {
+      setFlashKey({ appId: data.id, key: data.apiKey, label: data.name })
+      qc.invalidateQueries({ queryKey: ['merchant-apps'] })
+    },
+  })
+
+  useEffect(() => {
+    if (!isLoading && (apps as MerchantApp[]).length === 0 && !autoProvisionFired.current) {
+      autoProvisionFired.current = true
+      autoProvision.mutate()
+    }
+  }, [isLoading, apps]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const createApp = useMutation({
     mutationFn: () => appsApi.create({ name: appName.trim(), description: appDesc.trim() || undefined, isTestMode: appMode === 'test' }),
@@ -1105,13 +1129,26 @@ function KeysTab() {
                       </button>
                     )}
                     {/* Revoke */}
-                    <button
-                      className="btn-danger text-[11px] py-1"
-                      disabled={revokeApp.isPending}
-                      onClick={() => { if (confirm(`Supprimer l'application « ${app.name} » ? Les intégrations utilisant cette clé cesseront de fonctionner.`)) revokeApp.mutate(app.id) }}
-                    >
-                      Supprimer
-                    </button>
+                    {deletingId === app.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-[var(--red)]">Confirmer la suppression ?</span>
+                        <button
+                          className="btn-danger text-[11px] py-1"
+                          disabled={revokeApp.isPending}
+                          onClick={() => { revokeApp.mutate(app.id); setDeletingId(null) }}
+                        >
+                          {revokeApp.isPending ? '…' : 'Oui'}
+                        </button>
+                        <button className="btn-ghost text-[11px] py-1" onClick={() => setDeletingId(null)}>Non</button>
+                      </div>
+                    ) : (
+                      <button
+                        className="btn-danger text-[11px] py-1"
+                        onClick={() => setDeletingId(app.id)}
+                      >
+                        Supprimer
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -4056,8 +4093,14 @@ function SimEventLog({ entries }: { entries: LogEntry[] }) {
   )
 }
 
-function SimPhone({ screen, txId, amount, ref_, desc, onConfirm, onCancel, onReset, polling, pollCount }:
-  { screen: PhoneScreen; txId?: string; amount?: number; ref_?: string; desc?: string; onConfirm: (pin: string) => void; onCancel: () => void; onReset: () => void; polling: boolean; pollCount: number }) {
+function SimPhone({ screen, txId, amount, ref_, desc, provider = 'MTN', onConfirm, onCancel, onReset, polling, pollCount }:
+  { screen: PhoneScreen; txId?: string; amount?: number; ref_?: string; desc?: string; provider?: 'MTN' | 'ORANGE'; onConfirm: (pin: string) => void; onCancel: () => void; onReset: () => void; polling: boolean; pollCount: number }) {
+  const isMtn = provider !== 'ORANGE'
+  const opColor   = isMtn ? '#FFD700' : '#FF6600'
+  const opBg      = isMtn ? '#FFFDE7' : '#FFF3E0'
+  const opLabel   = isMtn ? 'MTN MoMo' : 'Orange Money'
+  const opNetwork = isMtn ? 'MTN CM'   : 'ORANGE CM'
+  const opUssd    = isMtn ? '*126#'    : '#150*50#'
   const [pin, setPin] = useState('')
   const [pinError, setPinError] = useState(false)
   useEffect(() => { setPin(''); setPinError(false) }, [screen])
@@ -4086,7 +4129,7 @@ function SimPhone({ screen, txId, amount, ref_, desc, onConfirm, onCancel, onRes
           {/* Status bar */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 12px 4px', background: '#000', color: 'white', fontFamily: 'DM Mono, monospace', fontSize: 10 }}>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 1 }}>{[4,6,8,10].map(h => <div key={h} style={{ width: 3, height: h, background: 'white', borderRadius: 1 }}/>)}</div>
-            <span style={{ letterSpacing: 1 }}>MTN CM</span>
+            <span style={{ letterSpacing: 1 }}>{opNetwork}</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9 }}>
               <span>4G</span>
               <div style={{ width: 18, height: 9, border: '1.5px solid white', borderRadius: 2, display: 'flex', alignItems: 'center', padding: '1px 1.5px' }}><div style={{ width: '70%', height: '100%', background: 'white', borderRadius: 1 }} /></div>
@@ -4098,7 +4141,7 @@ function SimPhone({ screen, txId, amount, ref_, desc, onConfirm, onCancel, onRes
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#000', padding: '28px 16px', minHeight: 220 }}>
               <div style={{ fontSize: 30, fontWeight: 300, color: 'white', fontFamily: 'DM Mono, monospace', letterSpacing: 3 }}>{clockTime}</div>
               <div style={{ fontSize: 10, color: '#666', fontFamily: 'DM Mono, monospace', marginTop: 4, textAlign: 'center' }}>{new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-              <div style={{ marginTop: 20, background: '#FFD700', color: '#000', fontSize: 10, fontWeight: 700, padding: '4px 14px', borderRadius: 3, letterSpacing: 1, fontFamily: 'DM Mono, monospace' }}>MTN MoMo</div>
+              <div style={{ marginTop: 20, background: opColor, color: '#000', fontSize: 10, fontWeight: 700, padding: '4px 14px', borderRadius: 3, letterSpacing: 1, fontFamily: 'DM Mono, monospace' }}>{opLabel}</div>
               <div style={{ marginTop: 8, fontSize: 9, color: '#444', fontFamily: 'DM Mono, monospace', textAlign: 'center' }}>En attente d'une requête USSD...</div>
             </div>
           )}
@@ -4106,8 +4149,8 @@ function SimPhone({ screen, txId, amount, ref_, desc, onConfirm, onCancel, onRes
           {/* USSD */}
           {screen === 'ussd' && (
             <div style={{ display: 'flex', flexDirection: 'column', background: '#000', padding: '8px 8px 10px' }}>
-              <div style={{ background: '#FFD700', padding: '6px 10px', borderRadius: '4px 4px 0 0', fontSize: 11, fontWeight: 700, color: '#000', fontFamily: 'DM Mono, monospace', textAlign: 'center' }}>MTN Mobile Money — *126#</div>
-              <div style={{ background: '#FFFDE7', padding: 10, borderRadius: '0 0 4px 4px', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#000', lineHeight: 1.6 }}>
+              <div style={{ background: opColor, padding: '6px 10px', borderRadius: '4px 4px 0 0', fontSize: 11, fontWeight: 700, color: '#000', fontFamily: 'DM Mono, monospace', textAlign: 'center' }}>{opLabel} — {opUssd}</div>
+              <div style={{ background: opBg, padding: 10, borderRadius: '0 0 4px 4px', fontFamily: 'DM Mono, monospace', fontSize: 11, color: '#000', lineHeight: 1.6 }}>
                 <div style={{ fontWeight: 700, marginBottom: 3 }}>PAIEMENT MOBILE MONEY</div>
                 <div style={{ fontSize: 9, color: '#555', marginBottom: 2 }}>Transaction ID:</div>
                 <div style={{ fontSize: 9, wordBreak: 'break-all', marginBottom: 6, color: '#333' }}>{txId?.slice(0, 28)}...</div>
@@ -4118,7 +4161,7 @@ function SimPhone({ screen, txId, amount, ref_, desc, onConfirm, onCancel, onRes
                 <div style={{ fontSize: 10, fontWeight: 600, marginBottom: 8 }}>{desc}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: 10, color: '#333', flexShrink: 0 }}>PIN:</span>
-                  <div style={{ flex: 1, background: 'white', border: `1px solid ${pinError ? '#C02020' : '#333'}`, borderRadius: 3, padding: '3px 6px', fontFamily: 'DM Mono, monospace', fontSize: 14, letterSpacing: 5, color: '#000', textAlign: 'center', minHeight: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'border .2s' }}>
+                  <div style={{ flex: 1, background: 'white', border: `1px solid ${pinError ? '#C02020' : opColor}`, borderRadius: 3, padding: '3px 6px', fontFamily: 'DM Mono, monospace', fontSize: 14, letterSpacing: 5, color: '#000', textAlign: 'center', minHeight: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'border .2s' }}>
                     {pin ? '•'.repeat(pin.length) : <span style={{ color: '#BBB', fontSize: 11 }}>_ _ _ _ _</span>}
                   </div>
                 </div>
@@ -4134,9 +4177,9 @@ function SimPhone({ screen, txId, amount, ref_, desc, onConfirm, onCancel, onRes
           {/* PROCESSING */}
           {screen === 'processing' && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#000', padding: 20, minHeight: 220, textAlign: 'center' }}>
-              <div style={{ width: 44, height: 44, border: '3px solid #FFD700', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .8s linear infinite', margin: '0 auto 14px' }} />
-              <div style={{ color: '#FFD700', fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700 }}>TRAITEMENT...</div>
-              <div style={{ color: '#888', fontFamily: 'DM Mono, monospace', fontSize: 10, marginTop: 6 }}>{polling ? `Poll #${pollCount} en cours...` : 'Validation MTN MoMo'}</div>
+              <div style={{ width: 44, height: 44, border: `3px solid ${opColor}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .8s linear infinite', margin: '0 auto 14px' }} />
+              <div style={{ color: opColor, fontFamily: 'DM Mono, monospace', fontSize: 12, fontWeight: 700 }}>TRAITEMENT...</div>
+              <div style={{ color: '#888', fontFamily: 'DM Mono, monospace', fontSize: 10, marginTop: 6 }}>{polling ? `Poll #${pollCount} en cours...` : `Validation ${opLabel}`}</div>
             </div>
           )}
 
@@ -4148,8 +4191,8 @@ function SimPhone({ screen, txId, amount, ref_, desc, onConfirm, onCancel, onRes
               </div>
               <div style={{ color: '#22C55E', fontFamily: 'DM Mono, monospace', fontSize: 13, fontWeight: 700, marginBottom: 6 }}>PAIEMENT RÉUSSI</div>
               <div style={{ color: '#22C55E', fontFamily: 'DM Mono, monospace', fontSize: 15, fontWeight: 700 }}>{amount ? fmtXAF(amount) : ''}</div>
-              <div style={{ color: '#555', fontFamily: 'DM Mono, monospace', fontSize: 9, marginTop: 8 }}>débités sur votre compte MTN MoMo</div>
-              <div style={{ marginTop: 12, background: '#FFD700', color: '#000', fontSize: 9, fontWeight: 700, padding: '3px 10px', borderRadius: 2, fontFamily: 'DM Mono, monospace', letterSpacing: 1 }}>MTN MoMo</div>
+              <div style={{ color: '#555', fontFamily: 'DM Mono, monospace', fontSize: 9, marginTop: 8 }}>débités sur votre compte {opLabel}</div>
+              <div style={{ marginTop: 12, background: opColor, color: '#000', fontSize: 9, fontWeight: 700, padding: '3px 10px', borderRadius: 2, fontFamily: 'DM Mono, monospace', letterSpacing: 1 }}>{opLabel}</div>
             </div>
           )}
 
@@ -4180,7 +4223,7 @@ function SimPhone({ screen, txId, amount, ref_, desc, onConfirm, onCancel, onRes
       <p className="text-center text-[11px] text-[var(--text-3)] max-w-[220px] leading-relaxed">
         {screen === 'idle'       && "Initiez un paiement pour recevoir le prompt USSD"}
         {screen === 'ussd'       && "Entrez le PIN (ex: 1234) puis OK pour confirmer, ✕ pour refuser"}
-        {screen === 'processing' && (polling ? `Poll #${pollCount}/12 — vérification toutes les 5s` : 'Validation MTN MoMo' )}
+        {screen === 'processing' && (polling ? `Poll #${pollCount}/12 — vérification toutes les 5s` : `Validation ${opLabel}` )}
         {screen === 'success'    && "Paiement confirmé. Webhook payment.completed déclenché."}
         {(screen === 'failed' || screen === 'cancelled') && "Transaction terminée. OK ou ✕ pour réinitialiser."}
       </p>
@@ -4225,7 +4268,7 @@ function SimulatorTab() {
   const { user } = useAuth()
   const dxActor = { userId: user.id, userName: user.name, role: user.role, merchantId: user.merchantId }
   const [state,     setState]     = useState<SimState>('idle')
-  const [form,      setForm]      = useState<PaymentForm>({ amount: 5000, phone: '237677123456', name: 'Jean Dupont', ref: 'TEST_SIM_001', description: 'Paiement test ST Pay', scenario: 'success' })
+  const [form,      setForm]      = useState<PaymentForm>({ amount: 5000, phone: '237677123456', name: 'Jean Dupont', ref: 'TEST_SIM_001', description: 'Paiement test ST Pay', scenario: 'success', provider: 'MTN' })
   const [txId,      setTxId]      = useState<string | null>(null)
   const [startedAt, setStartedAt] = useState(0)
   const [logs,      setLogs]      = useState<LogEntry[]>([{ time: '--:--:--', message: 'Simulateur prêt — configurez et initiez un paiement.', type: 'info' }])
@@ -4309,14 +4352,15 @@ function SimulatorTab() {
 
   const initMutation = useMutation({
     mutationFn: async () => {
+      const metadata: Record<string, unknown> = { simulatorMode: true, scenario: form.scenario }
       const payload = buildPaymentInitiationPayload({
         amount: form.amount,
         currency: 'XAF',
-        provider: 'MTN',
+        provider: form.provider,
         customer: { phoneNumber: form.phone, name: form.name, email: 'test@stpay.local' },
         merchant: { reference: form.ref, callbackUrl: `${window.location.origin}/callback`, name: 'ST Pay Simulator' },
         description: form.description,
-        metadata: { simulatorMode: true, scenario: form.scenario },
+        metadata,
       })
       const res = await client.post('/api/Payment', payload)
       return res.data as { transactionId?: string; id?: string; providerReference?: string }
@@ -4325,7 +4369,7 @@ function SimulatorTab() {
       setApiError(null)
       setState('initiating'); setStartedAt(Date.now())
       addLog(`Initiation paiement — ${fmtXAF(form.amount)} → ${form.phone}`, 'info')
-      addLog('POST /api/Payment — provider: MTN (mock si active cote backend)', 'info')
+      addLog(`POST /api/Payment — provider: ${form.provider} (mock si active cote backend)`, 'info')
     },
     onSuccess: (data) => {
       const id = data.transactionId || data.id || `SIM-${Date.now()}`
@@ -4380,9 +4424,40 @@ function SimulatorTab() {
           <div className="panel">
             <div className="panel-header">
               <span className="panel-title">Configurer le paiement test</span>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[var(--amber-bg)] text-[var(--amber)] border border-[var(--amber-border)]">MTN MoMo TEST</span>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[var(--amber-bg)] text-[var(--amber)] border border-[var(--amber-border)]">{form.provider} TEST</span>
             </div>
             <div className="p-4 space-y-4">
+              {/* Provider selector */}
+              <div>
+                <label className="block mb-1.5 text-[11px] font-semibold text-[var(--text-2)]">Opérateur</label>
+                <div className="flex gap-2">
+                  {(['MTN', 'ORANGE'] as const).map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      disabled={!canInitiate}
+                      onClick={() => canInitiate && setForm(f => ({ ...f, provider: p }))}
+                      className={`flex-1 py-2 rounded-[6px] border text-[12px] font-bold transition-all disabled:opacity-50 ${
+                        form.provider === p
+                          ? p === 'MTN'
+                            ? 'border-amber-400 bg-amber-50 text-amber-700'
+                            : 'border-orange-400 bg-orange-50 text-orange-700'
+                          : 'border-[var(--border)] hover:bg-[var(--bg-subtle)] text-[var(--text-2)]'
+                      }`}
+                    >
+                      {p === 'MTN' ? '🟡 MTN MoMo' : '🟠 Orange Money'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Orange USSD Push info */}
+              {form.provider === 'ORANGE' && (
+                <div className="rounded-[6px] border border-orange-200 bg-orange-50 px-3 py-2 text-[11px] text-orange-700">
+                  🟠 <strong>USSD Push</strong> — Orange Money enverra un prompt <code>#150*50#</code> sur le téléphone du client. Le client entre son PIN directement sur son téléphone.
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { label: 'Montant (XAF)', key: 'amount', type: 'number', ph: '5000' },
@@ -4425,8 +4500,8 @@ function SimulatorTab() {
               <div className="p-3 bg-[var(--orange-bg)] rounded-[6px] border border-[var(--orange-border)]">
                 <p className="text-[11px] font-bold text-[var(--orange-dark)] mb-1">Mode simulateur actif</p>
                 <p className="text-[10px] text-[var(--text-2)]">
-                  Appel reel vers <code className="font-mono">POST /api/Payment</code> avec provider MTN.
-                  Si le mode mock backend est actif pour MTN, la reponse reste simulee tout en respectant la validation API.
+                  Appel reel vers <code className="font-mono">POST /api/Payment</code> avec provider {form.provider}.
+                  Si le mode mock backend est actif pour {form.provider}, la reponse reste simulee tout en respectant la validation API.
                 </p>
               </div>
 
@@ -4463,7 +4538,7 @@ function SimulatorTab() {
 
         <div className="lg:sticky lg:top-4">
           <SimPhone
-            screen={phoneScreen} txId={txId ?? undefined} amount={form.amount}
+            screen={phoneScreen} txId={txId ?? undefined} amount={form.amount} provider={form.provider}
             ref_={form.ref} desc={form.description}
             onConfirm={handleConfirm} onCancel={handleCancel} onReset={handleReset}
             polling={polling} pollCount={pollCount}

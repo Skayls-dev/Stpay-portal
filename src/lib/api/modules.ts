@@ -1,6 +1,5 @@
 import client from './client'
 import type { UserRole } from '../../hooks/useAuth'
-import { postApiPaymentByPaymentIdPush } from '../../api/sdk.gen'
 
 export const POLL_INTERVAL_TRANSACTIONS = 15_000
 export const POLL_INTERVAL_PROVIDERS = 60_000
@@ -81,14 +80,10 @@ export interface Transaction {
   status: string
   merchantId?: string
   merchantName?: string
-  customerPhone?: string
-  customerName?: string
   createdAt?: string
   updatedAt?: string
   description?: string
   paymentUrl?: string
-  applicationId?: string
-  applicationName?: string
   escrow?: {
     escrowId: string
     status: string
@@ -266,14 +261,8 @@ interface TransactionSummaryDto {
   merchantId?: string
   merchantName?: string
   merchantRef?: string
-  customerPhone?: string
-  customerName?: string
   createdAt?: string
   completedAt?: string
-  escrowId?: string
-  escrowStatus?: string
-  applicationId?: string
-  applicationName?: string
 }
 
 interface PagedTransactionSummaryDto {
@@ -317,15 +306,8 @@ const toTransactionFromSummary = (item: TransactionSummaryDto): Transaction => (
   status: item.status,
   merchantId: item.merchantId ?? item.merchantRef,
   merchantName: item.merchantName,
-  customerPhone: item.customerPhone,
-  customerName: item.customerName,
   createdAt: item.createdAt,
   updatedAt: item.completedAt,
-  applicationId: item.applicationId,
-  applicationName: item.applicationName,
-  escrow: item.escrowId && item.escrowStatus
-    ? { escrowId: item.escrowId, status: item.escrowStatus, releaseMode: 'PickupCode' }
-    : undefined,
 })
 
 const parseTransactionListPayload = (payload: unknown): Transaction[] => {
@@ -383,16 +365,17 @@ const statusTextMap: Record<string, string> = {
 }
 
 export const transactionsApi = {
-  async list(filters?: { status?: string; provider?: string; merchantId?: string; from?: string; to?: string; appId?: string }): Promise<Transaction[]> {
-    const params: Record<string, string> = {}
-    if (filters?.status && filters.status !== 'all') params.status = filters.status
-    if (filters?.provider && filters.provider !== 'all') params.provider = filters.provider
-    if (filters?.from) params.from = filters.from
-    if (filters?.to) params.to = `${filters.to}T23:59:59`
-    if (filters?.appId) params.appId = filters.appId
-
-    const response = await client.get('/api/payment', { params: Object.keys(params).length ? params : undefined })
+  async list(filters?: { status?: string; provider?: string; merchantId?: string }): Promise<Transaction[]> {
+    const response = await client.get('/api/payment')
     let txs = parseTransactionListPayload(response.data)
+
+    if (filters?.status && filters.status !== 'all') {
+      txs = txs.filter((t) => t.status.toLowerCase() === filters.status?.toLowerCase())
+    }
+
+    if (filters?.provider && filters.provider !== 'all') {
+      txs = txs.filter((t) => t.provider.toLowerCase() === filters.provider?.toLowerCase())
+    }
 
     if (filters?.merchantId && filters.merchantId !== 'all') {
       txs = txs.filter((t) => t.merchantId === filters.merchantId)
@@ -405,25 +388,6 @@ export const transactionsApi = {
     if (!transactionId) return null
     const response = await client.get(`/api/payment/${transactionId}`)
     return parseTransactionStatusPayload(response.data)
-  },
-
-  async pushPayment(transactionId: string): Promise<{ pushTriggered?: boolean; [key: string]: unknown }> {
-    if (!transactionId) {
-      throw new Error('transactionId is required')
-    }
-
-    const apiKey = typeof window !== 'undefined' ? localStorage.getItem('stpay_api_key') || '' : ''
-    const token = typeof window !== 'undefined' ? localStorage.getItem('stpay_token') || '' : ''
-
-    return await postApiPaymentByPaymentIdPush({
-      path: { paymentId: transactionId },
-      headers: {
-        ...(apiKey ? { 'X-Api-Key': apiKey } : {}),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      responseStyle: 'data',
-      throwOnError: true,
-    }) as { pushTriggered?: boolean; [key: string]: unknown }
   },
 
   getStatusText(status: string): string {
@@ -499,67 +463,6 @@ export const analyticsApi = {
   },
 }
 
-export interface MerchantApp {
-  id: string
-  name: string
-  description?: string
-  mode: 'test' | 'live'
-  keyStatus: string
-  keyPrefix: string
-  lastUsedAt?: string
-  createdAt?: string
-  updatedAt?: string
-}
-
-export interface CreateAppResult {
-  id: string
-  name: string
-  description?: string
-  mode: string
-  apiKey: string   // shown only once at creation
-  createdAt?: string
-}
-
-export interface RotateAppResult {
-  id: string
-  apiKey: string   // shown only once after rotation
-  mode: string
-  rotatedAt?: string
-}
-
-export const appsApi = {
-  async list(): Promise<MerchantApp[]> {
-    const response = await client.get('/api/apps')
-    const data = response.data as { apps?: Array<Record<string, unknown>> }
-    if (!Array.isArray(data?.apps)) return []
-    return data.apps.map((a) => ({
-      id:          String(a.id || ''),
-      name:        String(a.name || ''),
-      description: typeof a.description === 'string' ? a.description : undefined,
-      mode:        (String(a.mode || 'test') as 'test' | 'live'),
-      keyStatus:   String(a.keyStatus || 'Active'),
-      keyPrefix:   String(a.keyPrefix || ''),
-      lastUsedAt:  typeof a.lastUsedAt === 'string' ? a.lastUsedAt : undefined,
-      createdAt:   typeof a.createdAt  === 'string' ? a.createdAt  : undefined,
-      updatedAt:   typeof a.updatedAt  === 'string' ? a.updatedAt  : undefined,
-    }))
-  },
-
-  async create(input: { name: string; description?: string; isTestMode: boolean }): Promise<CreateAppResult> {
-    const response = await client.post('/api/apps', input)
-    return response.data as CreateAppResult
-  },
-
-  async revoke(appId: string): Promise<void> {
-    await client.delete(`/api/apps/${appId}`)
-  },
-
-  async rotate(appId: string, isTestMode: boolean): Promise<RotateAppResult> {
-    const response = await client.post(`/api/apps/${appId}/rotate?isTestMode=${isTestMode}`)
-    return response.data as RotateAppResult
-  },
-}
-
 export const merchantsApi = {
   async list(): Promise<Merchant[]> {
     const response = await client.get('/api/keys')
@@ -574,6 +477,45 @@ export const merchantsApi = {
       mode: (String(item.mode || 'test') as 'test' | 'live'),
       createdAt: typeof item.createdAt === 'string' ? item.createdAt : undefined,
     }))
+  },
+
+  async getProfile() {
+    const response = await client.get('/api/merchant/me')
+    return response.data as {
+      merchantId: string
+      merchantName: string
+      kycStatus: string
+      legalName?: string
+      businessEmail?: string
+      phoneNumber?: string
+      registrationNumber?: string
+      taxId?: string
+      addressLine1?: string
+      city?: string
+      homeCountryCode?: string
+      businessSector?: string
+      websiteUrl?: string
+      webhookUrl?: string
+      updatedAt?: string
+    }
+  },
+
+  async updateProfile(data: {
+    name?: string
+    legalName?: string
+    businessEmail?: string
+    phoneNumber?: string
+    registrationNumber?: string
+    taxId?: string
+    addressLine1?: string
+    city?: string
+    homeCountryCode?: string
+    businessSector?: string
+    websiteUrl?: string
+    webhookUrl?: string
+  }) {
+    const response = await client.put('/api/merchant/me', data)
+    return response.data
   },
 
   async create(input: { isTestMode: boolean }) {
@@ -591,6 +533,63 @@ export const merchantsApi = {
       `/api/keys/rotate?currentApiKey=${encodeURIComponent(input.currentApiKey)}&isTestMode=${input.isTestMode}`,
     )
     return response.data as { apiKey: string; mode: 'test' | 'live'; createdAt?: string }
+  },
+
+  async getSessions(): Promise<PortalSession[]> {
+    const response = await client.get('/api/merchant/me/sessions')
+    return (response.data?.sessions ?? []) as PortalSession[]
+  },
+
+  async getMembers(): Promise<MerchantMember[]> {
+    const response = await client.get('/api/merchant/me/members')
+    return (response.data?.members ?? []) as MerchantMember[]
+  },
+
+  async inviteMember(data: {
+    email: string
+    password: string
+    role?: 'owner' | 'developer' | 'member'
+    displayName?: string
+  }): Promise<MerchantMember> {
+    const response = await client.post('/api/merchant/me/members', data)
+    return response.data as MerchantMember
+  },
+
+  async sendInvitation(data: {
+    email: string
+    role?: 'owner' | 'developer' | 'member'
+    displayName?: string
+  }): Promise<{ message: string }> {
+    const response = await client.post('/api/merchant/me/invitations', data)
+    return response.data
+  },
+
+  async getInvitation(token: string): Promise<{
+    email: string
+    merchantName: string
+    role: string
+    displayName?: string
+    expiresAt: string
+  }> {
+    const response = await client.get(`/api/merchant/invite/info?token=${encodeURIComponent(token)}`)
+    return response.data
+  },
+
+  async acceptInvitation(data: {
+    token: string
+    password: string
+    displayName?: string
+  }): Promise<{
+    token: string
+    user: { id: string; name: string; role: string; merchantId: string; portalRole: string }
+    email: string
+  }> {
+    const response = await client.post('/api/merchant/invite/accept', data)
+    return response.data
+  },
+
+  async removeMember(userId: string): Promise<void> {
+    await client.delete(`/api/merchant/me/members/${userId}`)
   },
 }
 
@@ -632,6 +631,8 @@ export const providersHealthApi = {
       return [
         { name: 'MTN', supportedFeatures: [] },
         { name: 'ORANGE', supportedFeatures: [] },
+        { name: 'WAVE', supportedFeatures: [] },
+        { name: 'MOOV', supportedFeatures: [] },
       ]
     }
   },
@@ -673,24 +674,10 @@ export const healthApi = {
 }
 
 export const escrowApi = {
-  async list(merchantId?: string, status?: string, appId?: string) {
-    const params: Record<string, string> = {}
-    if (merchantId) params.merchantId = merchantId
-    if (status) params.status = status
-    if (appId) params.appId = appId
-    const response = await client.get('/api/escrow', { params: Object.keys(params).length ? params : undefined })
-    return response.data
-  },
-
-  async simulate(data: {
-    amount: number
-    currency: string
-    customerPhone: string
-    description?: string
-    releaseMode: string
-    autoTimeoutDays?: number
-  }) {
-    const response = await client.post('/api/escrow/simulate', data)
+  async list(merchantId?: string, status?: string) {
+    const response = await client.get('/api/escrow', {
+      params: { merchantId, status },
+    })
     return response.data
   },
 
@@ -725,17 +712,47 @@ export const escrowApi = {
   },
 }
 
-export interface MerchantBalance {
-  availableBalance: number
-  pendingBalance: number
-  reservedBalance: number
-  currency: string
-  lastUpdated: string | null
+export interface AdminMerchantApp {
+  id: string
+  name: string
+  description?: string
+  mode: 'live' | 'test'
+  keyStatus: string
+  keyPrefix: string
+  lastUsedAt?: string
+  createdAt: string
 }
 
-export const balanceApi = {
-  get: (): Promise<MerchantBalance> =>
-    client.get<MerchantBalance>('/api/merchant/balance').then((r) => r.data),
+export interface AdminMerchantWithApps {
+  id: string
+  name: string
+  kycStatus: string
+  apps: AdminMerchantApp[]
+}
+
+export interface IpAllowlistConfig {
+  merchantId: string
+  merchantName: string
+  restricted: boolean
+  allowedIps: string[] | null
+}
+
+export interface PortalSession {
+  id: string
+  email?: string          // present in admin view, absent in merchant own view
+  ipAddress: string | null
+  userAgent: string | null
+  success: boolean
+  failureReason: string | null
+  createdAt: string
+}
+
+export interface MerchantMember {
+  userId: string
+  email: string
+  role: 'owner' | 'developer' | 'member'
+  displayName: string | null
+  createdAt: string
 }
 
 export const adminConfigApi = {
@@ -749,6 +766,38 @@ export const adminConfigApi = {
       blockedEmails,
     })
     return response.data as MerchantPortalBlockedEmailsConfig
+  },
+
+  async listMerchantApps(): Promise<AdminMerchantWithApps[]> {
+    const response = await client.get('/api/admin/config/merchants/apps')
+    return (response.data?.merchants ?? response.data) as AdminMerchantWithApps[]
+  },
+
+  async adminRotateApp(merchantId: string, appId: string): Promise<{ appId: string; newKey: string }> {
+    const response = await client.post(`/api/admin/config/merchants/${merchantId}/apps/${appId}/rotate`)
+    return response.data
+  },
+
+  async adminRevokeApp(merchantId: string, appId: string): Promise<{ revoked: boolean }> {
+    const response = await client.delete(`/api/admin/config/merchants/${merchantId}/apps/${appId}`)
+    return response.data
+  },
+
+  async getIpAllowlist(merchantId: string): Promise<IpAllowlistConfig> {
+    const response = await client.get(`/api/admin/config/merchants/${merchantId}/ip-allowlist`)
+    return response.data as IpAllowlistConfig
+  },
+
+  async setIpAllowlist(merchantId: string, allowedIps: string[]): Promise<IpAllowlistConfig> {
+    const response = await client.put(`/api/admin/config/merchants/${merchantId}/ip-allowlist`, {
+      allowedIps,
+    })
+    return response.data as IpAllowlistConfig
+  },
+
+  async getMerchantSessions(merchantId: string): Promise<PortalSession[]> {
+    const response = await client.get(`/api/admin/config/merchants/${merchantId}/sessions`)
+    return (response.data?.sessions ?? []) as PortalSession[]
   },
 }
 
@@ -770,7 +819,7 @@ export const settlementsApi = {
     return response.data as SettlementTransactionItem[]
   },
 
-  async trigger(input: { merchantId: string; currency: string; notes?: string }) {
+  async trigger(input: { merchantId: string; currency: string; notes?: string; payoutAccountId?: string }) {
     const response = await client.post('/api/settlements/trigger', input)
     return response.data as {
       settlementId: string
@@ -782,9 +831,29 @@ export const settlementsApi = {
     }
   },
 
+  async getPayoutAccount(merchantId: string) {
+    const response = await client.get(`/api/settlements/merchants/${merchantId}/payout-account`)
+    return response.data as {
+      merchantId: string
+      accounts: Array<{
+        id: string
+        provider: string
+        accountNumber: string
+        accountHolderName: string
+        currency: string
+        isDefault: boolean
+      }>
+    }
+  },
+
   async markProcessed(settlementId: string, notes?: string) {
     const response = await client.patch(`/api/settlements/${settlementId}/mark-processed`, { notes })
     return response.data as { settlementId: string; processedAt?: string; notes?: string }
+  },
+
+  async forceCompletePending(input: { merchantId: string; provider?: string; limit?: number }) {
+    const response = await client.post('/api/settlements/dev/force-complete-pending', input)
+    return response.data as { forced: number; refs: string[] }
   },
 
   async updatePayoutAccount(input: {
@@ -824,5 +893,146 @@ export const settlementsApi = {
   async transactionStatusHistory(transactionId: string) {
     const response = await client.get(`/api/settlements/transactions/${transactionId}/status-history`)
     return response.data as TransactionStatusHistoryItem[]
+  },
+}
+
+export interface PayoutAccount {
+  id: string
+  provider: string
+  accountNumber: string
+  accountHolderName: string
+  currency: string
+  isDefault: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export const payoutAccountsApi = {
+  async list(): Promise<PayoutAccount[]> {
+    const response = await client.get('/api/merchant/payout-accounts')
+    return (response.data?.accounts ?? response.data) as PayoutAccount[]
+  },
+
+  async create(payload: Omit<PayoutAccount, 'id' | 'createdAt' | 'updatedAt'>): Promise<PayoutAccount> {
+    const response = await client.post('/api/merchant/payout-accounts', payload)
+    return response.data as PayoutAccount
+  },
+
+  async update(id: string, payload: Omit<PayoutAccount, 'id' | 'createdAt' | 'updatedAt'>): Promise<PayoutAccount> {
+    const response = await client.put(`/api/merchant/payout-accounts/${id}`, payload)
+    return response.data as PayoutAccount
+  },
+
+  async remove(id: string): Promise<void> {
+    await client.delete(`/api/merchant/payout-accounts/${id}`)
+  },
+}
+
+// ── KRI types ────────────────────────────────────────────────────────────────
+
+export interface KriSeries {
+  labels: Record<string, string>
+  value: number | null
+}
+
+export interface KriResult {
+  id: string
+  label: string
+  unit: 'percent' | 'count' | 'seconds'
+  value: number | null
+  status: 'ok' | 'warning' | 'critical' | 'unknown' | 'unavailable'
+  warnThreshold: number
+  critThreshold: number
+  series: KriSeries[]
+}
+
+export interface PrometheusAlert {
+  labels: Record<string, string>
+  annotations: Record<string, string>
+  state: string
+  activeAt?: string
+}
+
+export interface KriDashboardResponse {
+  kris: KriResult[]
+  activeAlerts: PrometheusAlert[]
+}
+
+export const kriApi = {
+  async dashboard(): Promise<KriDashboardResponse> {
+    const response = await client.get('/api/admin/kri')
+    return response.data as KriDashboardResponse
+  },
+}
+
+export const balanceApi = {
+  async get(): Promise<{ availableBalance: number; reservedBalance: number; currency: string }> {
+    const response = await client.get('/api/merchant/balance')
+    return response.data
+  },
+}
+
+export interface MerchantApp {
+  id: string
+  name: string
+  description?: string
+  mode: 'live' | 'test'
+  keyStatus: string
+  keyPrefix: string
+  lastUsedAt?: string
+  createdAt: string
+  updatedAt?: string
+}
+
+export const appsApi = {
+  async list(): Promise<MerchantApp[]> {
+    const response = await client.get('/api/apps')
+    return (response.data?.apps ?? response.data) as MerchantApp[]
+  },
+
+  async create(payload: { name: string; description?: string; isTestMode: boolean }) {
+    const response = await client.post('/api/apps', payload)
+    return response.data as MerchantApp & { apiKey: string }
+  },
+
+  async rotate(id: string, isTestMode = true) {
+    const response = await client.post(`/api/apps/${id}/rotate`, null, { params: { isTestMode } })
+    return response.data as { id: string; apiKey: string }
+  },
+
+  async revoke(id: string) {
+    const response = await client.delete(`/api/apps/${id}`)
+    return response.data as { revoked: boolean; id: string }
+  },
+}
+
+// ── Guide Videos ─────────────────────────────────────────────────────────────
+
+export interface GuideVideoConfig {
+  guideId: string
+  youtubeId: string
+  title: string
+  description?: string | null
+  updatedAt: string
+  updatedByAdminId: string
+}
+
+export const guideVideosApi = {
+  async list(): Promise<GuideVideoConfig[]> {
+    try {
+      const response = await client.get('/api/guide-videos')
+      return (response.data ?? []) as GuideVideoConfig[]
+    } catch {
+      // Endpoint not yet available (backend not started or old build)
+      return []
+    }
+  },
+
+  async upsert(
+    guideId: string,
+    payload: { youtubeId: string; title: string; description?: string },
+  ): Promise<GuideVideoConfig> {
+    const response = await client.put(`/api/guide-videos/${guideId}`, payload)
+    return response.data as GuideVideoConfig
   },
 }

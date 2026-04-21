@@ -14,7 +14,11 @@ export interface LoginResponse {
     name: string
     role: UserRole
     merchantId?: string
+    portalRole?: string
   }
+  /** true when the email belongs to multiple merchant accounts */
+  ambiguous?: boolean
+  accounts?: { merchantId: string; merchantName: string }[]
 }
 
 export type LoginPortal = 'admin' | 'merchant' | 'auto'
@@ -62,6 +66,11 @@ export const authApi = {
 
   registerMerchant: async (payload: MerchantRegisterPayload): Promise<MerchantRegisterResponse> => {
     const response = await client.post<MerchantRegisterResponse>('/api/merchant/register', payload)
+    return response.data
+  },
+
+  loginSelect: async (credentials: LoginCredentials, merchantId: string): Promise<LoginResponse> => {
+    const response = await client.post<LoginResponse>('/api/merchant/login/select', { ...credentials, merchantId })
     return response.data
   },
 
