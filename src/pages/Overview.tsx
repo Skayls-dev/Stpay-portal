@@ -149,7 +149,7 @@ function SparkBar({ data }: { data: number[] }) {
   )
 }
 
-
+1
 const PROVIDERS = [
   { name: 'MTN MoMo',     short: 'MTN', pct: 63, vol: 89_200_000, bar: '#FFC700' },
   { name: 'Orange Money', short: 'ORA', pct: 25, vol: 35_800_000, bar: '#FF6600' },
