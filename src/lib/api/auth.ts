@@ -15,10 +15,16 @@ export interface LoginResponse {
     role: UserRole
     merchantId?: string
     portalRole?: string
+    psiAccepted?: boolean
   }
   /** true when the email belongs to multiple merchant accounts */
   ambiguous?: boolean
   accounts?: { merchantId: string; merchantName: string }[]
+  /** "totp_required" when the admin has 2FA enabled — challengeToken must be used */
+  status?: 'totp_required'
+  challengeToken?: string
+  totpEnrolled?: boolean
+  totpDeadline?: string | null
 }
 
 export type LoginPortal = 'admin' | 'merchant' | 'auto'
@@ -76,5 +82,48 @@ export const authApi = {
 
   changePassword: async (currentPassword: string, newPassword: string): Promise<void> => {
     await client.put('/api/merchant/me/password', { currentPassword, newPassword })
+  },
+
+  getMerchantPsiStatus: async (): Promise<{ psiAccepted: boolean; policyFormat?: string; policyVersion?: string }> => {
+    const response = await client.get('/api/merchant/me/psi')
+    return response.data
+  },
+
+  acceptMerchantPsi: async (): Promise<LoginResponse> => {
+    const response = await client.post<LoginResponse>('/api/merchant/me/psi/accept')
+    return response.data
+  },
+
+  adminTotpVerify: async (challengeToken: string, code?: string, recoveryCode?: string): Promise<LoginResponse> => {
+    const response = await client.post<LoginResponse>('/api/admin/login/totp-verify', {
+      challengeToken,
+      code,
+      recoveryCode,
+    })
+    return response.data
+  },
+
+  adminSetup2fa: async (): Promise<{ secret: string; uri: string }> => {
+    const response = await client.get<{ secret: string; uri: string }>('/api/admin/2fa/setup')
+    return response.data
+  },
+
+  adminConfirm2fa: async (secret: string, code: string): Promise<{ message: string; recoveryCodes: string[] }> => {
+    const response = await client.post<{ message: string; recoveryCodes: string[] }>('/api/admin/2fa/confirm', { secret, code })
+    return response.data
+  },
+
+  admin2faStatus: async (): Promise<{
+    totpEnabled: boolean
+    totpDeadline?: string | null
+    daysRemaining?: number | null
+    recoveryCodesRemaining: number
+  }> => {
+    const response = await client.get('/api/admin/2fa/status')
+    return response.data
+  },
+
+  adminReset2fa: async (payload: { targetAdminId: string; actorTotpCode: string; reason: string }): Promise<void> => {
+    await client.post('/api/admin/2fa/reset', payload)
   },
 }

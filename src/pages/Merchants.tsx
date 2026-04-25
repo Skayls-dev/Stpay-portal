@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { adminConfigApi } from '../lib/api/modules'
-import type { AdminMerchantWithApps, AdminMerchantApp, IpAllowlistConfig, PortalSession } from '../lib/api/modules'
+import type { AdminMerchant, AdminMerchantWithApps, AdminMerchantApp, IpAllowlistConfig, PortalSession } from '../lib/api/modules'
 import { Card, Badge, Button, Modal } from '../components/ui'
 import RequirePermission from '../components/auth/RequirePermission'
 

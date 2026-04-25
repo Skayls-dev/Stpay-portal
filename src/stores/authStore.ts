@@ -10,6 +10,7 @@ export interface AuthUser {
   merchantId?: string
   permissions: string[]
   portalRole?: PortalRole  // only for merchant portal users
+  psiAccepted?: boolean
 }
 
 export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
@@ -102,6 +103,7 @@ const STORAGE = {
   userRole: 'stpay_user_role',
   merchantId: 'stpay_merchant_id',
   portalRole: 'stpay_portal_role',
+  psiAccepted: 'stpay_psi_accepted',
 }
 
 function loadFromStorage(): AuthUser | null {
@@ -115,6 +117,8 @@ function loadFromStorage(): AuthUser | null {
       storedRole === 'merchant' || storedRole === 'super_admin' ? storedRole : 'super_admin'
 
     const portalRole = (localStorage.getItem(STORAGE.portalRole) as PortalRole) || undefined
+    const psiAcceptedRaw = localStorage.getItem(STORAGE.psiAccepted)
+    const psiAccepted = psiAcceptedRaw === 'true'
     const permissions =
       role === 'merchant' && portalRole
         ? PORTAL_ROLE_PERMISSIONS[portalRole]
@@ -127,6 +131,7 @@ function loadFromStorage(): AuthUser | null {
       merchantId: localStorage.getItem(STORAGE.merchantId) || undefined,
       permissions,
       portalRole,
+      psiAccepted,
     }
   } catch {
     return null
@@ -136,6 +141,7 @@ function loadFromStorage(): AuthUser | null {
 interface AuthStore {
   user: AuthUser | null
   login: (user: Omit<AuthUser, 'permissions'>, token: string, apiKey?: string) => void
+  setPsiAccepted: (accepted: boolean) => void
   logout: () => void
 }
 
@@ -160,6 +166,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
     } else {
       localStorage.removeItem(STORAGE.portalRole)
     }
+    localStorage.setItem(STORAGE.psiAccepted, userData.psiAccepted ? 'true' : 'false')
     set({
       user: {
         ...userData,
@@ -169,6 +176,13 @@ export const useAuthStore = create<AuthStore>((set) => ({
             : ROLE_PERMISSIONS[userData.role],
       },
     })
+  },
+
+  setPsiAccepted: (accepted) => {
+    localStorage.setItem(STORAGE.psiAccepted, accepted ? 'true' : 'false')
+    set((state) => ({
+      user: state.user ? { ...state.user, psiAccepted: accepted } : state.user,
+    }))
   },
 
   logout: () => {

@@ -581,7 +581,7 @@ export const merchantsApi = {
     displayName?: string
   }): Promise<{
     token: string
-    user: { id: string; name: string; role: string; merchantId: string; portalRole: string }
+    user: { id: string; name: string; role: string; merchantId: string; portalRole: string; psiAccepted?: boolean }
     email: string
   }> {
     const response = await client.post('/api/merchant/invite/accept', data)
@@ -730,6 +730,28 @@ export interface AdminMerchantWithApps {
   apps: AdminMerchantApp[]
 }
 
+export interface AdminMerchant {
+  id: string
+  name: string
+  kycStatus: string
+  isActive: boolean
+  email?: string
+  createdAt: string
+  updatedAt: string
+  appCount: number
+  sessionCount: number
+}
+
+export interface MerchantsPaginationResponse {
+  merchants: AdminMerchant[]
+  pagination: {
+    page: number
+    pageSize: number
+    total: number
+    totalPages: number
+  }
+}
+
 export interface IpAllowlistConfig {
   merchantId: string
   merchantName: string
@@ -771,6 +793,28 @@ export const adminConfigApi = {
   async listMerchantApps(): Promise<AdminMerchantWithApps[]> {
     const response = await client.get('/api/admin/config/merchants/apps')
     return (response.data?.merchants ?? response.data) as AdminMerchantWithApps[]
+  },
+
+  async listMerchantsPaginated(
+    page = 1,
+    pageSize = 25,
+    search?: string,
+    kycStatus?: string,
+    isActive?: boolean,
+    sortBy = 'name',
+    sortDir = 'asc',
+  ): Promise<MerchantsPaginationResponse> {
+    const params = new URLSearchParams()
+    params.append('page', String(page))
+    params.append('pageSize', String(pageSize))
+    if (search) params.append('search', search)
+    if (kycStatus) params.append('kycStatus', kycStatus)
+    if (isActive !== undefined) params.append('isActive', String(isActive))
+    params.append('sortBy', sortBy)
+    params.append('sortDir', sortDir)
+
+    const response = await client.get(`/api/admin/config/merchants?${params.toString()}`)
+    return response.data as MerchantsPaginationResponse
   },
 
   async adminRotateApp(merchantId: string, appId: string): Promise<{ appId: string; newKey: string }> {

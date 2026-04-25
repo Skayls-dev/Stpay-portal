@@ -5,10 +5,22 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import App from './App.jsx'
 import './index.css'
 
+const shouldRetryQuery = (failureCount, error) => {
+  const status = Number(error?.status || 0)
+  const code = String(error?.code || '')
+
+  if (status === 403 && code === 'PSI_REQUIRED') {
+    return false
+  }
+
+  return failureCount < 3
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30 * 1000,
+      retry: shouldRetryQuery,
     },
   },
 })

@@ -77,7 +77,7 @@ export default function AcceptInvite() {
       )
 
       toast.success(`Bienvenue sur STPay ! Vous avez rejoint ${info?.merchantName}.`)
-      navigate('/dashboard')
+      navigate(result.user.psiAccepted ? '/merchant' : '/merchant/psi')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erreur lors de l\'activation'
       toast.error(msg)

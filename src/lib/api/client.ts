@@ -1,12 +1,15 @@
 import axios from 'axios'
+import toast from 'react-hot-toast'
 
 export type ApiClientError = Error & {
   status?: number
+  code?: string
   data?: unknown
   url?: string
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE ?? ''
+let hasShownPsiRequiredToast = false
 
 const client = axios.create({
   baseURL: API_BASE_URL,
@@ -37,6 +40,8 @@ const AUTH_STORAGE_KEYS = [
   'stpay_user_name',
   'stpay_user_role',
   'stpay_merchant_id',
+  'stpay_portal_role',
+  'stpay_psi_accepted',
 ]
 
 client.interceptors.response.use(
@@ -59,9 +64,18 @@ client.interceptors.response.use(
       AUTH_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key))
       window.location.href = '/choose-portal'
     }
+    const errorCode = String(error?.response?.data?.code || error?.response?.data?.errorCode || '')
+    const isPsiRequired = error?.response?.status === 403 && errorCode === 'PSI_REQUIRED'
+
+    if (isPsiRequired && !hasShownPsiRequiredToast) {
+      hasShownPsiRequiredToast = true
+      toast.error('Veuillez lire et accepter la PSI pour continuer.')
+    }
+
     const message = error?.response?.data?.message || error?.response?.data?.Error || error?.message || 'Erreur API'
     const apiError = new Error(message) as ApiClientError
     apiError.status = error?.response?.status
+    apiError.code = errorCode || undefined
     apiError.data = error?.response?.data
     apiError.url = requestUrl
     return Promise.reject(apiError)

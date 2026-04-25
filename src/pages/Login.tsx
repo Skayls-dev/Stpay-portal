@@ -1,5 +1,5 @@
 // src/pages/Login.tsx
-import { useState } from 'react'
+import { useRef, useState, type KeyboardEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import toast from 'react-hot-toast'
@@ -9,6 +9,10 @@ import { useAuthStore } from '../stores/authStore'
 
 interface LoginForm { email: string; password: string }
 interface LoginProps { portal?: 'admin' | 'merchant' }
+
+const TOTP_INPUT = `w-16 h-14 text-center text-[22px] font-bold rounded-[8px] border
+  border-[var(--border-med)] bg-white outline-none transition-all
+  focus:border-[var(--orange)] focus:shadow-[0_0_0_3px_rgba(255,102,0,0.10)]`
 
 const INPUT = (err: boolean) =>
   `w-full rounded-[6px] border px-3.5 py-2.5 text-[13px] outline-none transition-all
@@ -31,8 +35,24 @@ export default function Login({ portal = 'merchant' }: LoginProps) {
   const [pendingCredentials, setPendingCredentials] = useState<LoginForm | null>(null)
   const [selectLoading, setSelectLoading] = useState(false)
 
+  // TOTP state
+  const [totpChallengeToken, setTotpChallengeToken] = useState<string | null>(null)
+  const [totpDigits, setTotpDigits] = useState(['', '', '', '', '', ''])
+  const [totpLoading, setTotpLoading] = useState(false)
+  const [useRecoveryCode, setUseRecoveryCode] = useState(false)
+  const [recoveryCode, setRecoveryCode] = useState('')
+  const totpRefs = [
+    useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null),
+  ]
+
   const finalizeLogin = async (res: Awaited<ReturnType<typeof authApi.login>>) => {
     login(res.user, res.token, res.apiKey)
+
+    if (res.user.role === 'merchant' && !res.user.psiAccepted) {
+      navigate('/merchant/psi', { replace: true })
+      return
+    }
 
     if (res.user.role === 'merchant' && !res.apiKey) {
       try {
@@ -70,9 +90,17 @@ export default function Login({ portal = 'merchant' }: LoginProps) {
     try {
       const res = await authApi.login(data, { portal })
 
+      // TOTP challenge — show 6-digit screen
+      if (res.status === 'totp_required' && res.challengeToken) {
+        setTotpChallengeToken(res.challengeToken)
+        setLoading(false)
+        setTimeout(() => totpRefs[0].current?.focus(), 100)
+        return
+      }
+
       const isRoleMismatch =
-        (portal === 'merchant' && res.user.role !== 'merchant') ||
-        (portal === 'admin' && res.user.role !== 'super_admin')
+        (portal === 'merchant' && res.user?.role !== 'merchant') ||
+        (portal === 'admin' && res.user?.role !== 'super_admin')
 
       if (isRoleMismatch) {
         toast.error(
@@ -93,6 +121,122 @@ export default function Login({ portal = 'merchant' }: LoginProps) {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Connexion impossible')
     } finally { setLoading(false) }
+  }
+
+  const onTotpSubmit = async () => {
+    if (!totpChallengeToken) return
+    const code = totpDigits.join('')
+    if (!useRecoveryCode && code.length !== 6) return
+    if (useRecoveryCode && recoveryCode.trim().length < 6) return
+    setTotpLoading(true)
+    try {
+      const res = await authApi.adminTotpVerify(
+        totpChallengeToken,
+        useRecoveryCode ? undefined : code,
+        useRecoveryCode ? recoveryCode.trim() : undefined,
+      )
+      await finalizeLogin(res)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Code TOTP ou recovery code incorrect')
+      setTotpDigits(['', '', '', '', '', ''])
+      setRecoveryCode('')
+      setTimeout(() => totpRefs[0].current?.focus(), 50)
+    } finally {
+      setTotpLoading(false)
+    }
+  }
+
+  const onTotpDigitChange = (index: number, value: string) => {
+    const digit = value.replace(/\D/g, '').slice(-1)
+    const next = [...totpDigits]
+    next[index] = digit
+    setTotpDigits(next)
+    if (digit && index < 5) totpRefs[index + 1].current?.focus()
+    if (next.every(d => d !== '')) {
+      setTimeout(() => {
+        const fullCode = next.join('')
+        if (fullCode.length === 6) onTotpSubmit()
+      }, 80)
+    }
+  }
+
+  const onTotpKeyDown = (index: number, e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !totpDigits[index] && index > 0)
+      totpRefs[index - 1].current?.focus()
+    if (e.key === 'Enter') onTotpSubmit()
+  }
+
+  if (totpChallengeToken) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--bg-page)] px-4">
+        <div className="w-full max-w-sm bg-white border border-[var(--border-med)] rounded-[var(--r-lg)] p-8 shadow-sm">
+          <div className="mb-7 text-center">
+            <div className="mx-auto mb-4 w-[44px] h-[44px] rounded-[10px] flex items-center justify-center font-extrabold text-[15px] text-white" style={{ background: 'var(--orange)' }}>
+              ST
+            </div>
+            <h1 className="font-extrabold text-[20px] text-[var(--text-1)] tracking-tight">Vérification 2FA</h1>
+            <p className="mt-1.5 text-[13px] text-[var(--text-3)]">
+              {useRecoveryCode
+                ? 'Entrez un recovery code (usage unique).'
+                : 'Entrez le code à 6 chiffres de votre application TOTP.'}
+            </p>
+          </div>
+
+          {!useRecoveryCode ? (
+            <div className="flex justify-center gap-2 mb-6">
+              {totpDigits.map((d, i) => (
+                <input
+                  key={i}
+                  ref={totpRefs[i]}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={d}
+                  onChange={e => onTotpDigitChange(i, e.target.value)}
+                  onKeyDown={e => onTotpKeyDown(i, e)}
+                  className={TOTP_INPUT}
+                  disabled={totpLoading}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="mb-6">
+              <input
+                type="text"
+                value={recoveryCode}
+                onChange={(e) => setRecoveryCode(e.target.value.toUpperCase())}
+                placeholder="Ex: A8K2P9QX"
+                className="w-full rounded-[8px] border border-[var(--border-med)] bg-white px-3 py-2.5 text-[13px] outline-none transition-all focus:border-[var(--orange)] focus:shadow-[0_0_0_3px_rgba(255,102,0,0.10)]"
+                disabled={totpLoading}
+              />
+            </div>
+          )}
+
+          <button
+            onClick={onTotpSubmit}
+            disabled={totpLoading || (!useRecoveryCode && totpDigits.some(d => !d)) || (useRecoveryCode && recoveryCode.trim().length < 6)}
+            className="w-full py-2.5 rounded-[6px] text-[13px] font-bold text-white transition-colors disabled:opacity-50"
+            style={{ background: 'var(--orange)' }}
+          >
+            {totpLoading ? 'Vérification…' : 'Vérifier'}
+          </button>
+
+          <button
+            onClick={() => setUseRecoveryCode(!useRecoveryCode)}
+            className="mt-3 w-full text-center text-[12px] text-[var(--orange-dark)] hover:underline"
+          >
+            {useRecoveryCode ? 'Utiliser un code TOTP à la place' : 'Utiliser un recovery code'}
+          </button>
+
+          <button
+            onClick={() => { setTotpChallengeToken(null); setTotpDigits(['', '', '', '', '', '']) }}
+            className="mt-4 w-full text-center text-[12px] text-[var(--text-3)] hover:text-[var(--text-1)] transition-colors"
+          >
+            ← Retour
+          </button>
+        </div>
+      </div>
+    )
   }
 
   // Account picker screen

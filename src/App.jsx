@@ -11,7 +11,7 @@ import Login from './pages/Login';
 import MerchantRegister from './pages/MerchantRegister';
 import Overview from './pages/Overview';
 import Transactions from './pages/Transactions';
-import Merchants from './pages/Merchants';
+import MerchantsList from './pages/MerchantsList';
 import Webhooks from './pages/Webhooks';
 import Analytics from './pages/Analytics';
 import ProvidersHealth from './pages/ProvidersHealth';
@@ -75,13 +75,14 @@ function App() {
         <Route path="/admin/login"    element={<Login portal="admin" />} />
         <Route path="/register"       element={<MerchantRegister />} />
         <Route path="/accept-invite"   element={<AcceptInvite />} />
+        <Route path="/merchant/psi" element={<Navigate to="/merchant" replace />} />
         <Route path="/demo/webshop"   element={<WebshopPublicDemo />} />
         <Route path="/" element={<LandingPage />} />
 
         <Route path="/admin" element={<RequireAuth><RequireRole role="super_admin"><DashboardLayout /></RequireRole></RequireAuth>}>
           <Route index element={<Overview />} />
           <Route path="transactions" element={<RequirePermission permission={['transactions.view_own','transactions.view_all']}><Transactions /></RequirePermission>} />
-          <Route path="merchants"    element={<RequirePermission permission="merchants.view_all"><Merchants /></RequirePermission>} />
+          <Route path="merchants"    element={<RequirePermission permission="merchants.view_all"><MerchantsList /></RequirePermission>} />
           <Route path="webhooks"     element={<RequirePermission permission={['webhooks.view_own','webhooks.view_all']}><Webhooks /></RequirePermission>} />
           <Route path="analytics"    element={<RequirePermission permission={['analytics.view_own','analytics.view_all']}><Analytics /></RequirePermission>} />
           <Route path="providers"    element={<RequirePermission permission="providers.view_health"><ProvidersHealth /></RequirePermission>} />
