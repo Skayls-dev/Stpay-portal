@@ -1,0 +1,17 @@
+<svg width="420" height="120" viewBox="0 0 420 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="stpayOrange" x1="0" y1="0" x2="0" y2="120" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF7A00"/>
+      <stop offset="1" stop-color="#FF5A00"/>
+    </linearGradient>
+  </defs>
+
+  <g>
+    <rect x="12" y="34" width="124" height="18" rx="9" fill="url(#stpayOrange)"/>
+    <rect x="12" y="69" width="124" height="18" rx="9" fill="url(#stpayOrange)"/>
+    <path d="M136 44C136 27 122 16 104 16H42C24 16 10 27 10 44C10 60 24 72 42 72H94C99 72 103 76 103 80C103 85 99 88 94 88H10L2 106H96C114 106 128 95 128 78C128 62 114 50 96 50H44C39 50 35 47 35 42C35 38 39 34 44 34H129L136 16H42C24 16 10 27 10 44C10 60 24 72 42 72H94C99 72 103 76 103 80C103 85 99 88 94 88H10L2 106H96C114 106 128 95 128 78" fill="url(#stpayOrange)"/>
+    <path d="M148 16H252L244 34H208V106H182V34H140L148 16Z" fill="url(#stpayOrange)"/>
+  </g>
+
+  <text x="232" y="88" font-family="Plus Jakarta Sans, Arial, sans-serif" font-size="94" font-weight="800" fill="#090D18">Pay</text>
+</svg>

@@ -1,0 +1,11 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="stpayMarkOrange" x1="0" y1="0" x2="0" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF7A00"/>
+      <stop offset="1" stop-color="#FF5A00"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0B1120"/>
+  <path d="M13 21C13 17.1 16.1 14 20 14H45L43 20H20V22H38C41.9 22 45 25.1 45 29C45 32.9 41.9 36 38 36H21V38H43L45 44H20C16.1 44 13 40.9 13 37C13 33.1 16.1 30 20 30H37V28H20C16.1 28 13 24.9 13 21Z" fill="url(#stpayMarkOrange)"/>
+  <path d="M24 12H55L53 18H42V52H36V18H22L24 12Z" fill="url(#stpayMarkOrange)"/>
+</svg>

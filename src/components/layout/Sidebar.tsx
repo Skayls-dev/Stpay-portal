@@ -160,6 +160,7 @@ export default function Sidebar() {
       label: 'Développeur',
       items: [
         { to: `${basePath}/developer`, label: 'Developer Portal', icon: <IconDev /> },
+        { to: `${basePath}/quick-start`, label: 'Quick Start', icon: <IconGuide /> },
         { to: `${basePath}/guides`,    label: 'Guides Intégration', icon: <IconGuide />,
           ...(showGuidesNewBadge ? { badge: { text: 'NEW', variant: 'amber' as const } } : {}),
         },
@@ -185,15 +186,11 @@ export default function Sidebar() {
 
       <div className="px-4 py-[18px] border-b border-[var(--border-soft)]">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-[8px] flex items-center justify-center
-                          text-white font-extrabold text-[12px] flex-shrink-0"
-               style={{ background: 'var(--orange)' }}>
-            ST
-          </div>
-          <div>
-            <p className="font-extrabold text-[14px] text-[var(--text-1)] leading-none tracking-tight">ST Pay</p>
-            <p className="text-[10px] text-[var(--text-4)] mt-0.5 tracking-wide">Payment Gateway</p>
-          </div>
+          <img
+            src="/stpaylogo.png"
+            alt="STPay"
+            className="h-8 w-auto max-w-[160px] object-contain"
+          />
         </div>
         <div className="mt-2.5 inline-flex items-center gap-1.5 px-2 py-[3px] rounded-full
                         text-[10px] font-semibold font-mono border"

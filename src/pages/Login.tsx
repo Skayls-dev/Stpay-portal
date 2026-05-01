@@ -20,6 +20,16 @@ const INPUT = (err: boolean) =>
      ? 'border-[var(--red)] bg-[var(--red-bg)]'
      : 'border-[var(--border-med)] bg-white focus:border-[var(--orange)] focus:shadow-[0_0_0_3px_rgba(255,102,0,0.10)]'}`
 
+function BrandLogo({ compact = false }: { compact?: boolean }) {
+  return (
+    <img
+      src="/stpaylogo.png"
+      alt="STPay"
+      className={compact ? 'mx-auto h-10 w-auto max-w-[200px] object-contain' : 'mx-auto h-12 w-auto max-w-[240px] object-contain'}
+    />
+  )
+}
+
 export default function Login({ portal = 'merchant' }: LoginProps) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -171,8 +181,8 @@ export default function Login({ portal = 'merchant' }: LoginProps) {
       <div className="flex min-h-screen items-center justify-center bg-[var(--bg-page)] px-4">
         <div className="w-full max-w-sm bg-white border border-[var(--border-med)] rounded-[var(--r-lg)] p-8 shadow-sm">
           <div className="mb-7 text-center">
-            <div className="mx-auto mb-4 w-[44px] h-[44px] rounded-[10px] flex items-center justify-center font-extrabold text-[15px] text-white" style={{ background: 'var(--orange)' }}>
-              ST
+            <div className="mb-4">
+              <BrandLogo compact />
             </div>
             <h1 className="font-extrabold text-[20px] text-[var(--text-1)] tracking-tight">Vérification 2FA</h1>
             <p className="mt-1.5 text-[13px] text-[var(--text-3)]">
@@ -246,10 +256,8 @@ export default function Login({ portal = 'merchant' }: LoginProps) {
         <div className="w-full max-w-sm bg-white border border-[var(--border-med)]
                         rounded-[var(--r-lg)] p-8 shadow-sm">
           <div className="mb-6 text-center">
-            <div className="mx-auto mb-4 w-[44px] h-[44px] rounded-[10px]
-                            flex items-center justify-center font-extrabold text-[15px] text-white"
-                 style={{ background: 'var(--orange)' }}>
-              ST
+            <div className="mb-4">
+              <BrandLogo compact />
             </div>
             <h1 className="font-extrabold text-[18px] text-[var(--text-1)] tracking-tight">
               Choisir un compte
@@ -296,10 +304,8 @@ export default function Login({ portal = 'merchant' }: LoginProps) {
 
         {/* Header */}
         <div className="mb-7 text-center">
-          <div className="mx-auto mb-4 w-[44px] h-[44px] rounded-[10px]
-                          flex items-center justify-center font-extrabold text-[15px] text-white"
-               style={{ background: 'var(--orange)' }}>
-            ST
+          <div className="mb-4">
+            <BrandLogo />
           </div>
           <h1 className="font-extrabold text-[20px] text-[var(--text-1)] tracking-tight">
             {isAdmin ? 'Portail Admin' : 'Portail Marchand'}

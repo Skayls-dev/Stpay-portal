@@ -10,6 +10,16 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:5169',
         changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq, req) => {
+            const clientIp =
+              req.headers['x-forwarded-for']?.split(',')[0].trim() ||
+              req.socket?.remoteAddress ||
+              '127.0.0.1'
+            proxyReq.setHeader('X-Forwarded-For', clientIp)
+            proxyReq.setHeader('X-Real-IP', clientIp)
+          })
+        },
       }
     }
   },

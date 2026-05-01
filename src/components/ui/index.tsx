@@ -181,3 +181,6 @@ export function DataTable<T>({ columns, data, rowKey, onRowClick, emptyText = 'A
     </div>
   )
 }
+
+export { default as CodeSnippet } from './CodeSnippet'
+export { default as InlineCode } from './InlineCode'

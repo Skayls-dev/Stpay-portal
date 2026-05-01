@@ -777,6 +777,23 @@ export interface MerchantMember {
   createdAt: string
 }
 
+// ── Data-retention types ─────────────────────────────────────────────────
+export interface DataRetentionConfig {
+  webhookEventsDays: number
+  notificationsDays: number
+  dxAnalyticsEventsDays: number
+  sessionsDays: number
+  transactionStatusHistoryDays: number
+  fraudChecksDays: number
+  reconciliationJobsDays: number
+  batchSize: number
+}
+
+export interface DataRetentionConfigResponse {
+  fromDb: boolean
+  config: DataRetentionConfig
+}
+
 export const adminConfigApi = {
   async getMerchantPortalBlockedEmails(): Promise<MerchantPortalBlockedEmailsConfig> {
     const response = await client.get('/api/admin/config/merchant-portal-blocked-emails')
@@ -842,6 +859,16 @@ export const adminConfigApi = {
   async getMerchantSessions(merchantId: string): Promise<PortalSession[]> {
     const response = await client.get(`/api/admin/config/merchants/${merchantId}/sessions`)
     return (response.data?.sessions ?? []) as PortalSession[]
+  },
+
+  async getDataRetentionConfig(): Promise<DataRetentionConfigResponse> {
+    const response = await client.get('/api/admin/config/data-retention')
+    return response.data as DataRetentionConfigResponse
+  },
+
+  async saveDataRetentionConfig(config: DataRetentionConfig): Promise<DataRetentionConfigResponse> {
+    const response = await client.put('/api/admin/config/data-retention', config)
+    return response.data as DataRetentionConfigResponse
   },
 }
 

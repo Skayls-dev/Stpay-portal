@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import { Link } from 'react-router-dom'
 import {
   PAYMENT_POLL_INTERVAL_MS,
   PAYMENT_POLL_MAX_ATTEMPTS,
@@ -18,7 +19,8 @@ import {
   type MerchantApp,
   type CreateAppResult,
 } from '../lib/api/modules'
-import { Badge } from '../components/ui'
+import { Badge, CodeSnippet } from '../components/ui'
+import DeveloperGuideReference from '../components/DeveloperGuideReference'
 import client, { type ApiClientError } from '../lib/api/client'
 import {
   markDxStep,
@@ -288,397 +290,6 @@ function downloadPostmanCollectionFile(variant: PostmanCollectionVariant) {
   URL.revokeObjectURL(url)
 }
 
-const DEVELOPER_GUIDE_COPY_SNIPPETS: Record<string, string> = {
-  'curl-payment': `curl -X POST http://localhost:5169/api/Payment
-  -H "Content-Type: application/json"
-  -H "X-Api-Key: sk_test_votre_cle"
-  -d '{
-    "amount": 5000,
-    "currency": "XAF",
-    "provider": "MTN",
-    "customer": {
-      "phoneNumber": "237677123456",
-      "name": "Jean Dupont",
-      "email": "jean@example.com"
-    },
-    "merchant": {
-      "reference": "ORDER_001",
-      "callbackUrl": "https://example.com/callback",
-      "name": "Ma Boutique"
-    },
-    "description": "Paiement de test"
-  }'`,
-  'js-payment': `const response = await fetch('http://localhost:5169/api/Payment', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'X-Api-Key': 'sk_test_votre_cle'
-  },
-  body: JSON.stringify({
-    amount: 5000,
-    currency: 'XAF',
-    provider: 'MTN',
-    customer: {
-      phoneNumber: '237677123456',
-      name: 'Jean Dupont',
-      email: 'jean@example.com'
-    },
-    merchant: {
-      reference: 'ORDER_001',
-      callbackUrl: 'https://example.com/callback',
-      name: 'Ma Boutique'
-    },
-    description: 'Paiement de test'
-  })
-})
-
-const data = await response.json()
-console.log(data.transactionId)
-console.log(data.status)`,
-  'polling-status': `async function waitForFinalStatus(paymentId, apiKey) {
-  for (let attempt = 0; attempt < 12; attempt += 1) {
-    const res = await fetch('http://localhost:5169/api/Payment/' + paymentId, {
-      headers: { 'X-Api-Key': apiKey }
-    })
-
-    const payment = await res.json()
-    const status = String(payment.status || '').toUpperCase()
-
-    if (status.includes('SUCCESS')) return payment
-    if (status.includes('FAILED') || status.includes('ERROR') || status.includes('CANCELLED')) {
-      throw new Error('Paiement termine en echec: ' + status)
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 5000))
-  }
-
-  throw new Error('Timeout: aucun statut final recu')
-}`,
-  'dotnet-payment': `using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
-
-var http = new HttpClient { BaseAddress = new Uri("http://localhost:5169") };
-http.DefaultRequestHeaders.Add("X-Api-Key", "sk_test_votre_cle");
-
-var payload = new
-{
-    amount = 5000,
-    currency = "XAF",
-    provider = "MTN",
-    customer = new { phoneNumber = "237677123456", name = "Jean Dupont", email = "jean@example.com" },
-    merchant = new { reference = "ORDER_001", callbackUrl = "https://example.com/callback", name = "Ma Boutique" },
-    description = "Paiement de test"
-};
-
-var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-var response = await http.PostAsync("/api/Payment", content);
-var json = await response.Content.ReadAsStringAsync();
-
-Console.WriteLine($"HTTP {(int)response.StatusCode}");
-Console.WriteLine(json);`,
-  'java-payment': `import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-
-public class StPayExample {
-  public static void main(String[] args) throws Exception {
-    HttpClient client = HttpClient.newHttpClient();
-
-    String body = """
-      {
-        \"amount\": 5000,
-        \"currency\": \"XAF\",
-        \"provider\": \"MTN\",
-        \"customer\": {
-          \"phoneNumber\": \"237677123456\",
-          \"name\": \"Jean Dupont\",
-          \"email\": \"jean@example.com\"
-        },
-        \"merchant\": {
-          \"reference\": \"ORDER_001\",
-          \"callbackUrl\": \"https://example.com/callback\",
-          \"name\": \"Ma Boutique\"
-        },
-        \"description\": \"Paiement de test\"
-      }
-      """;
-
-    HttpRequest request = HttpRequest.newBuilder()
-      .uri(URI.create("http://localhost:5169/api/Payment"))
-      .header("Content-Type", "application/json")
-      .header("X-Api-Key", "sk_test_votre_cle")
-      .POST(HttpRequest.BodyPublishers.ofString(body))
-      .build();
-
-    HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-    System.out.println("HTTP " + response.statusCode());
-    System.out.println(response.body());
-  }
-}`,
-}
-
-const DEVELOPER_GUIDE_HTML = `
-  <section style="display:grid;gap:16px;line-height:1.65;color:#1f2937;">
-    <div style="padding:16px;border:1px solid #fed7aa;background:#fff7ed;border-radius:12px;">
-      <h3 style="margin:0 0 8px;font-size:18px;font-weight:800;color:#9a3412;">Guide complet ST Pay</h3>
-      <p style="margin:0;font-size:13px;">Cette documentation explique <strong>quoi envoyer</strong>, <strong>dans quel ordre</strong>, <strong>quel header utiliser</strong> et <strong>comment lire la reponse</strong>. Si vous debutez, commencez par le parcours "Premier paiement" ci-dessous.</p>
-    </div>
-
-    <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
-      <div style="padding:14px;border:1px solid #e5e7eb;background:#ffffff;border-radius:12px;">
-        <h4 style="margin:0 0 6px;font-size:14px;font-weight:800;">1. Choisir le bon portail</h4>
-        <p style="margin:0;font-size:13px;">Un <strong>marchand</strong> utilise sa cle API pour les paiements. Un <strong>super admin</strong> utilise un token Bearer pour les endpoints admin.</p>
-      </div>
-      <div style="padding:14px;border:1px solid #e5e7eb;background:#ffffff;border-radius:12px;">
-        <h4 style="margin:0 0 6px;font-size:14px;font-weight:800;">2. Authentification</h4>
-        <p style="margin:0;font-size:13px;">Routes marchand: header <code style="background:#f3f4f6;padding:2px 6px;border-radius:6px;">X-Api-Key</code>. Routes admin: header <code style="background:#f3f4f6;padding:2px 6px;border-radius:6px;">Authorization: Bearer ...</code>.</p>
-      </div>
-      <div style="padding:14px;border:1px solid #e5e7eb;background:#ffffff;border-radius:12px;">
-        <h4 style="margin:0 0 6px;font-size:14px;font-weight:800;">3. Tester progressivement</h4>
-        <p style="margin:0;font-size:13px;">Validez d'abord <code style="background:#f3f4f6;padding:2px 6px;border-radius:6px;">GET /api/Payment/health</code>, puis un profil marchand, puis un vrai paiement.</p>
-      </div>
-    </div>
-
-    <div style="padding:16px;border:1px solid #dbeafe;background:#eff6ff;border-radius:12px;">
-      <h4 style="margin:0 0 10px;font-size:16px;font-weight:800;color:#1d4ed8;">Premier paiement: parcours recommande</h4>
-      <ol style="margin:0;padding-left:18px;font-size:13px;display:grid;gap:8px;">
-        <li>Connectez-vous comme marchand et recuperez une cle API dans l'onglet <strong>Clés API</strong>.</li>
-        <li>Appelez <code style="background:#ffffff;padding:2px 6px;border-radius:6px;">POST /api/Payment</code> avec un montant, un provider et les informations client.</li>
-        <li>Recuperez le <code style="background:#ffffff;padding:2px 6px;border-radius:6px;">transactionId</code> retourne par l'API.</li>
-        <li>Interrogez <code style="background:#ffffff;padding:2px 6px;border-radius:6px;">GET /api/Payment/{paymentId}</code> jusqu'a obtenir un statut final.</li>
-        <li>Si besoin, remboursez via <code style="background:#ffffff;padding:2px 6px;border-radius:6px;">POST /api/Payment/{paymentId}/refund</code>.</li>
-      </ol>
-    </div>
-
-    <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));">
-      <div style="padding:16px;border:1px solid #e5e7eb;background:#ffffff;border-radius:12px;">
-        <h4 style="margin:0 0 10px;font-size:15px;font-weight:800;">Exemple cURL minimal</h4>
-        <div style="margin-bottom:10px;display:flex;justify-content:flex-end;">
-          <button type="button" data-copy-doc="curl-payment" style="border:1px solid #fdba74;background:#fff7ed;color:#9a3412;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;">Copier l'exemple</button>
-        </div>
-        <pre style="margin:0;overflow:auto;background:#111827;color:#f9fafb;padding:14px;border-radius:10px;font-size:12px;">curl -X POST http://localhost:5169/api/Payment
-  -H "Content-Type: application/json"
-  -H "X-Api-Key: sk_test_votre_cle"
-  -d '{
-    "amount": 5000,
-    "currency": "XAF",
-    "provider": "MTN",
-    "customer": {
-      "phoneNumber": "237677123456",
-      "name": "Jean Dupont",
-      "email": "jean@example.com"
-    },
-    "merchant": {
-      "reference": "ORDER_001",
-      "callbackUrl": "https://example.com/callback",
-      "name": "Ma Boutique"
-    },
-    "description": "Paiement de test"
-  }'</pre>
-      </div>
-
-      <div style="padding:16px;border:1px solid #e5e7eb;background:#ffffff;border-radius:12px;">
-        <h4 style="margin:0 0 10px;font-size:15px;font-weight:800;">Exemple JavaScript simple</h4>
-        <div style="margin-bottom:10px;display:flex;justify-content:flex-end;">
-          <button type="button" data-copy-doc="js-payment" style="border:1px solid #93c5fd;background:#eff6ff;color:#1d4ed8;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;">Copier l'exemple</button>
-        </div>
-        <pre style="margin:0;overflow:auto;background:#111827;color:#f9fafb;padding:14px;border-radius:10px;font-size:12px;">const response = await fetch('http://localhost:5169/api/Payment', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    'X-Api-Key': 'sk_test_votre_cle'
-  },
-  body: JSON.stringify({
-    amount: 5000,
-    currency: 'XAF',
-    provider: 'MTN',
-    customer: {
-      phoneNumber: '237677123456',
-      name: 'Jean Dupont',
-      email: 'jean@example.com'
-    },
-    merchant: {
-      reference: 'ORDER_001',
-      callbackUrl: 'https://example.com/callback',
-      name: 'Ma Boutique'
-    },
-    description: 'Paiement de test'
-  })
-})
-
-const data = await response.json()
-console.log(data.transactionId)
-console.log(data.status)</pre>
-      </div>
-    </div>
-
-    <div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));">
-      <div style="padding:16px;border:1px solid #e5e7eb;background:#ffffff;border-radius:12px;">
-        <h4 style="margin:0 0 10px;font-size:15px;font-weight:800;">Exemple .NET (HttpClient)</h4>
-        <div style="margin-bottom:10px;display:flex;justify-content:flex-end;">
-          <button type="button" data-copy-doc="dotnet-payment" style="border:1px solid #bae6fd;background:#f0f9ff;color:#0c4a6e;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;">Copier l'exemple</button>
-        </div>
-        <pre style="margin:0;overflow:auto;background:#111827;color:#f9fafb;padding:14px;border-radius:10px;font-size:12px;">using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
-
-var http = new HttpClient { BaseAddress = new Uri("http://localhost:5169") };
-http.DefaultRequestHeaders.Add("X-Api-Key", "sk_test_votre_cle");
-
-var payload = new
-{
-    amount = 5000,
-    currency = "XAF",
-    provider = "MTN",
-    customer = new { phoneNumber = "237677123456", name = "Jean Dupont", email = "jean@example.com" },
-    merchant = new { reference = "ORDER_001", callbackUrl = "https://example.com/callback", name = "Ma Boutique" },
-    description = "Paiement de test"
-};
-
-var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-var response = await http.PostAsync("/api/Payment", content);
-var json = await response.Content.ReadAsStringAsync();
-
-Console.WriteLine($"HTTP {(int)response.StatusCode}");
-Console.WriteLine(json);</pre>
-      </div>
-
-      <div style="padding:16px;border:1px solid #e5e7eb;background:#ffffff;border-radius:12px;">
-        <h4 style="margin:0 0 10px;font-size:15px;font-weight:800;">Exemple Java (HttpClient)</h4>
-        <div style="margin-bottom:10px;display:flex;justify-content:flex-end;">
-          <button type="button" data-copy-doc="java-payment" style="border:1px solid #bbf7d0;background:#f0fdf4;color:#166534;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;">Copier l'exemple</button>
-        </div>
-        <pre style="margin:0;overflow:auto;background:#111827;color:#f9fafb;padding:14px;border-radius:10px;font-size:12px;">import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-
-public class StPayExample {
-  public static void main(String[] args) throws Exception {
-    HttpClient client = HttpClient.newHttpClient();
-
-    String body = """
-      {
-        \"amount\": 5000,
-        \"currency\": \"XAF\",
-        \"provider\": \"MTN\",
-        \"customer\": {
-          \"phoneNumber\": \"237677123456\",
-          \"name\": \"Jean Dupont\",
-          \"email\": \"jean@example.com\"
-        },
-        \"merchant\": {
-          \"reference\": \"ORDER_001\",
-          \"callbackUrl\": \"https://example.com/callback\",
-          \"name\": \"Ma Boutique\"
-        },
-        \"description\": \"Paiement de test\"
-      }
-      """;
-
-    HttpRequest request = HttpRequest.newBuilder()
-      .uri(URI.create("http://localhost:5169/api/Payment"))
-      .header("Content-Type", "application/json")
-      .header("X-Api-Key", "sk_test_votre_cle")
-      .POST(HttpRequest.BodyPublishers.ofString(body))
-      .build();
-
-    HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-    System.out.println("HTTP " + response.statusCode());
-    System.out.println(response.body());
-  }
-}</pre>
-      </div>
-    </div>
-
-    <div style="padding:16px;border:1px solid #e5e7eb;background:#ffffff;border-radius:12px;">
-      <h4 style="margin:0 0 10px;font-size:15px;font-weight:800;">Exemple de polling du statut</h4>
-      <div style="margin-bottom:10px;display:flex;justify-content:flex-end;">
-        <button type="button" data-copy-doc="polling-status" style="border:1px solid #86efac;background:#f0fdf4;color:#166534;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;">Copier l'exemple</button>
-      </div>
-      <pre style="margin:0;overflow:auto;background:#111827;color:#f9fafb;padding:14px;border-radius:10px;font-size:12px;">async function waitForFinalStatus(paymentId, apiKey) {
-  for (let attempt = 0; attempt < 12; attempt += 1) {
-    const res = await fetch('http://localhost:5169/api/Payment/' + paymentId, {
-      headers: { 'X-Api-Key': apiKey }
-    })
-
-    const payment = await res.json()
-    const status = String(payment.status || '').toUpperCase()
-
-    if (status.includes('SUCCESS')) return payment
-    if (status.includes('FAILED') || status.includes('ERROR') || status.includes('CANCELLED')) {
-      throw new Error('Paiement termine en echec: ' + status)
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 5000))
-  }
-
-  throw new Error('Timeout: aucun statut final recu')
-}</pre>
-    </div>
-
-    <div style="padding:16px;border:1px solid #fecaca;background:#fef2f2;border-radius:12px;">
-      <h4 style="margin:0 0 10px;font-size:15px;font-weight:800;color:#b91c1c;">Erreurs frequentes et interpretation</h4>
-      <table style="width:100%;border-collapse:collapse;font-size:13px;">
-        <thead>
-          <tr>
-            <th style="text-align:left;padding:8px;border-bottom:1px solid #fca5a5;">Code</th>
-            <th style="text-align:left;padding:8px;border-bottom:1px solid #fca5a5;">Cause probable</th>
-            <th style="text-align:left;padding:8px;border-bottom:1px solid #fca5a5;">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style="padding:8px;border-bottom:1px solid #fee2e2;"><strong>400</strong></td>
-            <td style="padding:8px;border-bottom:1px solid #fee2e2;">Payload invalide, provider incorrect, champ manquant</td>
-            <td style="padding:8px;border-bottom:1px solid #fee2e2;">Verifier le JSON envoye et les noms de champs</td>
-          </tr>
-          <tr>
-            <td style="padding:8px;border-bottom:1px solid #fee2e2;"><strong>401</strong></td>
-            <td style="padding:8px;border-bottom:1px solid #fee2e2;">Header d'auth manquant ou invalide</td>
-            <td style="padding:8px;border-bottom:1px solid #fee2e2;">Verifier X-Api-Key ou Bearer token</td>
-          </tr>
-          <tr>
-            <td style="padding:8px;border-bottom:1px solid #fee2e2;"><strong>403</strong></td>
-            <td style="padding:8px;border-bottom:1px solid #fee2e2;">Bon login, mauvais role ou mauvais portail</td>
-            <td style="padding:8px;border-bottom:1px solid #fee2e2;">Utiliser le portail correspondant au compte</td>
-          </tr>
-          <tr>
-            <td style="padding:8px;"><strong>500</strong></td>
-            <td style="padding:8px;">Erreur serveur</td>
-            <td style="padding:8px;">Consulter les logs backend et re-tester avec un payload minimal</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div style="padding:16px;border:1px solid #e5e7eb;background:#ffffff;border-radius:12px;">
-      <h4 style="margin:0 0 10px;font-size:15px;font-weight:800;">Bonnes pratiques</h4>
-      <ul style="margin:0;padding-left:18px;font-size:13px;display:grid;gap:8px;">
-        <li>Commencez toujours avec un payload minimal qui marche, puis ajoutez les options une par une.</li>
-        <li>Logguez la requete envoyee et la reponse recue pendant vos tests.</li>
-        <li>Ne mettez jamais une cle <strong>sk_live_</strong> dans votre code frontend public.</li>
-        <li>Conservez le <code style="background:#f3f4f6;padding:2px 6px;border-radius:6px;">transactionId</code> des sa creation: il sert a suivre tout le cycle du paiement.</li>
-        <li>Quand vous voyez un 403, demandez-vous d'abord: <em>suis-je sur le bon portail avec le bon type d'auth ?</em></li>
-      </ul>
-    </div>
-
-    <div style="padding:16px;border:1px solid #ddd6fe;background:#f5f3ff;border-radius:12px;">
-      <h4 style="margin:0 0 10px;font-size:15px;font-weight:800;color:#5b21b6;">Glossaire express</h4>
-      <div style="display:grid;gap:10px;font-size:13px;">
-        <div><strong>Payload</strong>: le contenu JSON que vous envoyez dans le body d'une requete.</div>
-        <div><strong>Bearer token</strong>: jeton de connexion envoye dans le header Authorization pour les routes admin.</div>
-        <div><strong>API key</strong>: cle marchande envoyee dans le header X-Api-Key pour prouver l'identite du marchand.</div>
-        <div><strong>Polling</strong>: technique qui consiste a reinterroger regulierement une route pour suivre un statut.</div>
-        <div><strong>Webhook</strong>: appel HTTP envoye automatiquement par le backend vers votre systeme quand un evenement se produit.</div>
-        <div><strong>Provider</strong>: operateur ou canal de paiement utilise, par exemple MTN ou ORANGE.</div>
-        <div><strong>transactionId</strong>: identifiant unique d'un paiement. Gardez-le toujours pour suivre le paiement ou le rembourser.</div>
-      </div>
-    </div>
-  </section>
-`
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1395,11 +1006,19 @@ function PlaygroundTab({ goToTab }: { goToTab: (tab: Tab) => void }) {
                       </div>
                     </div>
                     {typeof error.body !== 'undefined' && error.body !== null && (
-                      <pre className="text-[11px] font-mono text-[var(--text-1)] bg-[var(--bg-subtle)] p-3 rounded-[6px] border border-[var(--border-soft)] overflow-auto max-h-64">{JSON.stringify(error.body, null, 2)}</pre>
+                      <CodeSnippet
+                        title="Corps d'erreur"
+                        code={JSON.stringify(error.body, null, 2)}
+                        preClassName="max-h-64 overflow-auto text-[11px]"
+                      />
                     )}
                   </div>
                 ) : (
-                  <pre className="text-[11px] font-mono text-[var(--text-1)] bg-[var(--bg-subtle)] p-3 rounded-[6px] border border-[var(--border-soft)] overflow-auto max-h-64">{JSON.stringify(response?.body, null, 2)}</pre>
+                  <CodeSnippet
+                    title="Réponse JSON"
+                    code={JSON.stringify(response?.body, null, 2)}
+                    preClassName="max-h-64 overflow-auto text-[11px]"
+                  />
                 )}
               </div>
             </div>
@@ -1464,7 +1083,11 @@ function PlaygroundTab({ goToTab }: { goToTab: (tab: Tab) => void }) {
                 </button>
               </div>
               {orangeWebhookResponse && (
-                <pre className="text-[11px] font-mono text-[var(--text-1)] bg-[var(--bg-subtle)] p-3 rounded-[6px] border border-[var(--border-soft)] overflow-auto max-h-64">{JSON.stringify(orangeWebhookResponse, null, 2)}</pre>
+                <CodeSnippet
+                  title="Réponse webhook Orange"
+                  code={JSON.stringify(orangeWebhookResponse, null, 2)}
+                  preClassName="max-h-64 overflow-auto text-[11px]"
+                />
               )}
             </div>
           </div>
@@ -1499,23 +1122,6 @@ function DocsTab() {
     if (auth === 'api-key') return 'Header requis : X-Api-Key: sk_test_your_key'
     if (auth === 'bearer') return 'Header requis : Authorization: Bearer <admin_token>'
     return null
-  }
-
-  const handleGuideClick = async (event: React.MouseEvent<HTMLDivElement>) => {
-    const target = event.target as HTMLElement | null
-    const button = target?.closest('[data-copy-doc]') as HTMLElement | null
-    const copyKey = button?.getAttribute('data-copy-doc')
-    if (!copyKey) return
-
-    const snippet = DEVELOPER_GUIDE_COPY_SNIPPETS[copyKey]
-    if (!snippet) return
-
-    try {
-      await navigator.clipboard.writeText(snippet)
-      toast.success('Exemple copie dans le presse-papiers')
-    } catch {
-      toast.error('Impossible de copier cet exemple')
-    }
   }
 
   const downloadPostmanCollection = (variant: PostmanCollectionVariant) => {
@@ -1555,11 +1161,9 @@ function DocsTab() {
           <span className="text-[11px] text-[var(--text-3)]">Guide pas a pas avec exemples pratiques</span>
         </div>
         <div className="p-4 bg-[var(--bg-subtle)]">
-          <div
-            className="rounded-[var(--r-md)] border border-[var(--border)] bg-white p-4"
-            onClick={handleGuideClick}
-            dangerouslySetInnerHTML={{ __html: DEVELOPER_GUIDE_HTML }}
-          />
+          <div className="rounded-[var(--r-md)] border border-[var(--border)] bg-white p-4">
+            <DeveloperGuideReference />
+          </div>
         </div>
       </div>
 
@@ -1569,14 +1173,12 @@ function DocsTab() {
             <p className="text-[13px] font-semibold text-[var(--text-1)]">Wearables & Companion Apps</p>
             <p className="text-[11px] text-[var(--text-3)]">Guide dedie smartwatch + mobile companion avec scenarios, sequence diagrams et snippets Android/iOS.</p>
           </div>
-          <a
+          <Link
             className="btn-primary text-[12px]"
-            href="/WEARABLES_COMPANION_GUIDE.html"
-            target="_blank"
-            rel="noreferrer"
+            to="/merchant/wearables-guide"
           >
             Ouvrir le guide wearables
-          </a>
+          </Link>
         </div>
       </div>
 
@@ -1584,23 +1186,6 @@ function DocsTab() {
         <div className="panel-header">
           <span className="panel-title">All Integration Guides</span>
           <span className="text-[11px] text-[var(--text-3)]">10 guides pratiques pour onboarding, fiabilite, securite et go-live</span>
-        </div>
-        <div className="p-4 bg-[var(--bg-subtle)] space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <a className="btn-primary text-[12px]" href="/ALL_INTEGRATION_GUIDES.html" target="_blank" rel="noreferrer">Ouvrir le guide complet HTML</a>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-2">
-            <a className="btn-secondary text-[11px] justify-center" href="/ALL_INTEGRATION_GUIDES.html#first-payment" target="_blank" rel="noreferrer">1. Premier paiement</a>
-            <a className="btn-secondary text-[11px] justify-center" href="/ALL_INTEGRATION_GUIDES.html#webhooks" target="_blank" rel="noreferrer">2. Webhooks production</a>
-            <a className="btn-secondary text-[11px] justify-center" href="/ALL_INTEGRATION_GUIDES.html#error-handling" target="_blank" rel="noreferrer">3. Gestion des erreurs</a>
-            <a className="btn-secondary text-[11px] justify-center" href="/ALL_INTEGRATION_GUIDES.html#api-security" target="_blank" rel="noreferrer">4. Securite API</a>
-            <a className="btn-secondary text-[11px] justify-center" href="/ALL_INTEGRATION_GUIDES.html#multi-operator" target="_blank" rel="noreferrer">5. Multi-operateurs</a>
-            <a className="btn-secondary text-[11px] justify-center" href="/ALL_INTEGRATION_GUIDES.html#go-live" target="_blank" rel="noreferrer">6. Go-live checklist</a>
-            <a className="btn-secondary text-[11px] justify-center" href="/ALL_INTEGRATION_GUIDES.html#observability" target="_blank" rel="noreferrer">7. Observabilite</a>
-            <a className="btn-secondary text-[11px] justify-center" href="/ALL_INTEGRATION_GUIDES.html#automated-tests" target="_blank" rel="noreferrer">8. Tests automatises</a>
-            <a className="btn-secondary text-[11px] justify-center" href="/ALL_INTEGRATION_GUIDES.html#api-migration" target="_blank" rel="noreferrer">9. Migration API</a>
-            <a className="btn-secondary text-[11px] justify-center" href="/ALL_INTEGRATION_GUIDES.html#l1-support" target="_blank" rel="noreferrer">10. Support L1</a>
-          </div>
         </div>
       </div>
 
@@ -2014,9 +1599,11 @@ client.escrow.dispute('ESC-XXXXXXXX', reason='Article non conforme à la descrip
                 Copier
               </button>
             </div>
-            <pre className="p-4 text-[11px] font-mono text-[var(--text-1)] leading-relaxed whitespace-pre-wrap overflow-x-auto bg-[var(--bg)]">
-              {stepCode[activeStep][integLang]}
-            </pre>
+            <CodeSnippet
+              title={`Étape ${activeStep + 1} — ${steps[activeStep].title}`}
+              code={stepCode[activeStep][integLang]}
+              preClassName="text-[11px]"
+            />
           </div>
 
           {/* Navigation */}
@@ -2076,7 +1663,7 @@ client.escrow.dispute('ESC-XXXXXXXX', reason='Article non conforme à la descrip
               </tbody>
             </table>
           </div>
-          <pre className="rounded-[6px] bg-[var(--bg)] border border-[var(--border-soft)] p-3 text-[11px] font-mono text-[var(--text-1)] leading-relaxed overflow-x-auto">{`// Exemple de payload escrow.released
+          <CodeSnippet title="Payload escrow.released" code={`// Exemple de payload escrow.released
 {
   "type": "escrow.released",
   "escrowId": "ESC-XXXXXXXX",
@@ -2085,7 +1672,7 @@ client.escrow.dispute('ESC-XXXXXXXX', reason='Article non conforme à la descrip
   "amount": 25000,
   "currency": "XAF",
   "releasedAt": "2024-08-15T14:22:00Z"
-}`}</pre>
+}`} preClassName="text-[11px]" />
         </div>
       </div>
 
@@ -2801,8 +2388,8 @@ System.out.println(http.send(HttpRequest.newBuilder()
             Copier
           </button>
         </div>
-        <div className="p-4 overflow-x-auto">
-          <pre className="text-[12px] font-mono text-[var(--text-1)] leading-relaxed whitespace-pre">{code}</pre>
+        <div className="p-4">
+          <CodeSnippet title={scenarios[scenario].label} code={code} preClassName="text-[12px] whitespace-pre" />
         </div>
       </div>
 
@@ -2810,7 +2397,7 @@ System.out.println(http.send(HttpRequest.newBuilder()
         <div className="panel-header"><span className="panel-title">Vérification des webhooks</span></div>
         <div className="p-4 space-y-3">
           <p className="text-[12px] text-[var(--text-2)]">Chaque webhook ST Pay inclut un header de signature HMAC-SHA256 pour vérifier son authenticité.</p>
-          <pre className="text-[11px] font-mono bg-[var(--bg-subtle)] border border-[var(--border-soft)] rounded-[6px] p-3 text-[var(--text-1)] overflow-x-auto">{`// Node.js — vérifier la signature d'un webhook
+          <CodeSnippet title="Node.js — vérifier la signature" code={`// Node.js — vérifier la signature d'un webhook
 const crypto = require('crypto');
 
 function verifyWebhook(payload, signature, secret) {
@@ -2827,7 +2414,7 @@ app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
     return res.status(401).send('Signature invalide');
   res.json({ received: true });
   processWebhookEvent(JSON.parse(req.body)); // traiter en async
-});`}</pre>
+});`} preClassName="text-[11px]" />
         </div>
       </div>
 
@@ -3436,13 +3023,7 @@ def stpay_webhook(request):
               <span className="text-[10px] font-mono text-[var(--text-3)]">📁 {meta.pkg}</span>
             </div>
             <div className="p-4 flex flex-col gap-3">
-              <div className="rounded-[6px] bg-[var(--bg)] border border-[var(--border-soft)] overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-soft)]">
-                  <span className="text-[10px] font-mono text-[var(--text-3)]">Terminal</span>
-                  <button className="text-[10px] text-[var(--text-3)] hover:text-[var(--accent)]" onClick={() => { navigator.clipboard.writeText(meta.install) }}>Copier</button>
-                </div>
-                <pre className="p-3 text-[11px] font-mono text-[var(--text-1)] leading-relaxed whitespace-pre-wrap">{code.install[sdk]}</pre>
-              </div>
+              <CodeSnippet title="Terminal" code={code.install[sdk]} preClassName="text-[11px]" />
               <div className="text-[11px] text-[var(--text-2)] leading-relaxed">
                 {sdk === 'js'     && '✅ Zéro dépendance runtime — fonctionne en Node.js ≥ 18, Deno, Bun et dans les bundlers ESM (Vite, webpack).'}
                 {sdk === 'php'    && '✅ Zéro dépendance — utilise l\'extension cURL native de PHP. Requiert PHP 7.4+ et Composer.'}
@@ -3468,13 +3049,7 @@ def stpay_webhook(request):
               <span className="text-[10px] text-[var(--text-3)]">create → poll → status final</span>
             </div>
             <div className="p-4 flex flex-col gap-3">
-              <div className="rounded-[6px] bg-[var(--bg)] border border-[var(--border-soft)] overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-soft)]">
-                  <span className="text-[10px] font-mono text-[var(--text-3)]">{meta.label}</span>
-                  <button className="text-[10px] text-[var(--text-3)] hover:text-[var(--accent)]" onClick={() => { navigator.clipboard.writeText(code.payment[sdk]) }}>Copier</button>
-                </div>
-                <pre className="p-3 text-[11px] font-mono text-[var(--text-1)] leading-relaxed whitespace-pre-wrap overflow-x-auto">{code.payment[sdk]}</pre>
-              </div>
+              <CodeSnippet title={meta.label} code={code.payment[sdk]} preClassName="text-[11px]" />
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[['MTN','Mobile Money','237677…'],['ORANGE','Orange Money','237655…']].map(([p, name, prefix]) => (
                   <div key={p} className="rounded-[6px] border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-2 text-[10px] flex flex-col gap-0.5">
@@ -3507,13 +3082,7 @@ def stpay_webhook(request):
               <div className="rounded-[6px] bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 text-[11px] text-amber-900 dark:text-amber-100 leading-relaxed">
                 ⚠️ Toujours lire le corps brut de la requête <strong>avant</strong> tout JSON.parse / json_decode. La signature porte sur le corps brut en bytes.
               </div>
-              <div className="rounded-[6px] bg-[var(--bg)] border border-[var(--border-soft)] overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-soft)]">
-                  <span className="text-[10px] font-mono text-[var(--text-3)]">{meta.label} — récepteur webhook</span>
-                  <button className="text-[10px] text-[var(--text-3)] hover:text-[var(--accent)]" onClick={() => { navigator.clipboard.writeText(code.webhook[sdk]) }}>Copier</button>
-                </div>
-                <pre className="p-3 text-[11px] font-mono text-[var(--text-1)] leading-relaxed whitespace-pre-wrap overflow-x-auto">{code.webhook[sdk]}</pre>
-              </div>
+              <CodeSnippet title={`${meta.label} — récepteur webhook`} code={code.webhook[sdk]} preClassName="text-[11px]" />
               <div className="text-[10px] text-[var(--text-3)] flex flex-col gap-0.5">
                 <span className="font-semibold text-[var(--text-2)]">Événements disponibles</span>
                 {[
@@ -3541,13 +3110,7 @@ def stpay_webhook(request):
               <span className="text-[10px] text-[var(--text-3)]">ApiError · NetworkError · codes</span>
             </div>
             <div className="p-4 flex flex-col gap-3">
-              <div className="rounded-[6px] bg-[var(--bg)] border border-[var(--border-soft)] overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-soft)]">
-                  <span className="text-[10px] font-mono text-[var(--text-3)]">{meta.label}</span>
-                  <button className="text-[10px] text-[var(--text-3)] hover:text-[var(--accent)]" onClick={() => { navigator.clipboard.writeText(code.errors[sdk]) }}>Copier</button>
-                </div>
-                <pre className="p-3 text-[11px] font-mono text-[var(--text-1)] leading-relaxed whitespace-pre-wrap overflow-x-auto">{code.errors[sdk]}</pre>
-              </div>
+              <CodeSnippet title={meta.label} code={code.errors[sdk]} preClassName="text-[11px]" />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {[
                   ['401','invalid_api_key','Clé API manquante ou invalide'],
@@ -3583,13 +3146,7 @@ def stpay_webhook(request):
                   💡 <code className="font-mono">AsyncStPayClient</code> nécessite <code className="font-mono">pip install "stpay-python[async]"</code>.
                 </div>
               )}
-              <div className="rounded-[6px] bg-[var(--bg)] border border-[var(--border-soft)] overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-soft)]">
-                  <span className="text-[10px] font-mono text-[var(--text-3)]">{meta.label}</span>
-                  <button className="text-[10px] text-[var(--text-3)] hover:text-[var(--accent)]" onClick={() => { navigator.clipboard.writeText(code.async[sdk]) }}>Copier</button>
-                </div>
-                <pre className="p-3 text-[11px] font-mono text-[var(--text-1)] leading-relaxed whitespace-pre-wrap overflow-x-auto">{code.async[sdk]}</pre>
-              </div>
+              <CodeSnippet title={meta.label} code={code.async[sdk]} preClassName="text-[11px]" />
             </div>
           </div>
         </div>
@@ -3606,13 +3163,11 @@ def stpay_webhook(request):
               </span>
             </div>
             <div className="p-4 flex flex-col gap-3">
-              <div className="rounded-[6px] bg-[var(--bg)] border border-[var(--border-soft)] overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-soft)]">
-                  <span className="text-[10px] font-mono text-[var(--text-3)]">{meta.label} — {sdk === 'js' ? 'Next.js route handlers' : sdk === 'php' ? 'Controller Laravel' : 'FastAPI + Django'}</span>
-                  <button className="text-[10px] text-[var(--text-3)] hover:text-[var(--accent)]" onClick={() => { navigator.clipboard.writeText(code.frameworks[sdk]) }}>Copier</button>
-                </div>
-                <pre className="p-3 text-[11px] font-mono text-[var(--text-1)] leading-relaxed whitespace-pre-wrap overflow-x-auto">{code.frameworks[sdk]}</pre>
-              </div>
+              <CodeSnippet
+                title={`${meta.label} — ${sdk === 'js' ? 'Next.js route handlers' : sdk === 'php' ? 'Controller Laravel' : 'FastAPI + Django'}`}
+                code={code.frameworks[sdk]}
+                preClassName="text-[11px]"
+              />
               <div className="text-[10px] text-[var(--text-3)]">
                 Des exemples complets sont disponibles dans <code className="font-mono">{meta.pkg}examples/</code>.
               </div>
@@ -3844,9 +3399,11 @@ func requestPaymentFromWatch(amount: Int) {
             <p className="text-[11px] text-[var(--text-3)]">Exemple minimal pour initier un paiement.</p>
             <button className="btn-secondary text-[11px]" onClick={() => copy(quickSnippets[platform], `Snippet ${platformLabels[platform]}`)}>Copier</button>
           </div>
-          <div className="overflow-x-auto border border-[var(--border-soft)] rounded-[var(--r-sm)] bg-[var(--bg-subtle)] p-3">
-            <pre className="text-[12px] font-mono text-[var(--text-1)] leading-relaxed whitespace-pre">{quickSnippets[platform]}</pre>
-          </div>
+          <CodeSnippet
+            title={`Snippet ${platformLabels[platform]}`}
+            code={quickSnippets[platform]}
+            preClassName="text-[12px] whitespace-pre"
+          />
         </div>
       </div>
 
@@ -4515,7 +4072,11 @@ function SimulatorTab() {
                     {apiError.url && <span>{apiError.url}</span>}
                   </div>
                   {typeof apiError.body !== 'undefined' && apiError.body !== null && (
-                    <pre className="overflow-auto rounded-[6px] border border-[var(--red-border)] bg-white p-3 text-[10px] font-mono text-[var(--text-1)] max-h-44">{JSON.stringify(apiError.body, null, 2)}</pre>
+                    <CodeSnippet
+                      title="Détails de l'erreur API"
+                      code={JSON.stringify(apiError.body, null, 2)}
+                      preClassName="max-h-44 overflow-auto text-[10px]"
+                    />
                   )}
                 </div>
               )}

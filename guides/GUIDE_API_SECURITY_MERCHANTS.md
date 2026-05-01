@@ -42,9 +42,30 @@ Mettre en place un socle securite simple et strict pour integrateurs marchands.
 - Endpoint cible et resultat (code HTTP)
 - Origine IP/agent quand disponible
 
+## Formation marchands - Gestion securisee des cles API
+
+Les marchands doivent etre formes sur les pratiques suivantes avant toute mise en production :
+
+### Stockage par variables d environnement
+- Ne jamais inscrire une cle API en dur dans le code source (ni frontend, ni backend)
+- Utiliser des variables d environnement (`.env`, secret manager, vault) pour stocker les cles
+- Les fichiers `.env` doivent etre dans `.gitignore` et ne jamais etre commites
+
+### Rotation obligatoire tous les 90 jours
+- Planifier une rotation de cle tous les 90 jours minimum
+- Generer la nouvelle cle depuis le portail marchand, la deployer, puis revoquer l ancienne
+- En cas de doute sur une fuite, revoquer immediatement sans attendre l echeance
+
+### Ne jamais committer une cle
+- Activer le secret scanning sur le depot (GitHub Advanced Security, GitGuardian, etc.)
+- En cas de commit accidentel : revoquer la cle immediatement, purger l historique git, auditer les acces
+- Former l equipe de developpement a verifier les fichiers stagges avant chaque `git commit`
+
 ## Checklist
 
-- Rotation cle active
+- Rotation cle active (echeance <= 90 jours)
+- Variables d environnement utilisees, aucune cle en dur dans le code
 - Secret scanning active dans repo
 - Regles RBAC testees
 - Alertes securite configurees
+- Equipe formee aux bonnes pratiques de gestion des cles

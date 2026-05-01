@@ -28,6 +28,8 @@ const PaymentSimulator = React.lazy(() => import('./pages/PaymentSimulator'));
 const WebshopPublicDemo = React.lazy(() => import('./pages/WebshopPublicDemo'));
 const IntegrationGuides = React.lazy(() => import('./pages/IntegrationGuides'));
 const GuideVideos       = React.lazy(() => import('./pages/GuideVideos'));
+const QuickStartGuide   = React.lazy(() => import('./pages/QuickStartGuide'));
+const WearablesGuide    = React.lazy(() => import('./pages/WearablesGuide'));
 import AdminConfig from './pages/AdminConfig'
 import KriAlerts from './pages/KriAlerts';
 import Compliance from './pages/Compliance';
@@ -77,6 +79,8 @@ function App() {
         <Route path="/accept-invite"   element={<AcceptInvite />} />
         <Route path="/merchant/psi" element={<Navigate to="/merchant" replace />} />
         <Route path="/demo/webshop"   element={<WebshopPublicDemo />} />
+        <Route path="/developer-portal" element={<Navigate to="/merchant/developer" replace />} />
+        <Route path="/quick-start"    element={<Navigate to="/merchant/quick-start" replace />} />
         <Route path="/" element={<LandingPage />} />
 
         <Route path="/admin" element={<RequireAuth><RequireRole role="super_admin"><DashboardLayout /></RequireRole></RequireAuth>}>
@@ -108,6 +112,8 @@ function App() {
           <Route path="developer"    element={<RequirePermission permission="merchants.view_own_keys"><DeveloperPortal /></RequirePermission>} />
           <Route path="simulator"    element={<RequirePermission permission="merchants.view_own_keys"><PaymentSimulator /></RequirePermission>} />
           <Route path="guides"       element={<RequirePermission permission="merchants.view_own_keys"><IntegrationGuides /></RequirePermission>} />
+          <Route path="quick-start"  element={<RequirePermission permission="merchants.view_own_keys"><QuickStartGuide /></RequirePermission>} />
+          <Route path="wearables-guide" element={<RequirePermission permission="merchants.view_own_keys"><WearablesGuide /></RequirePermission>} />
 
         </Route>
 

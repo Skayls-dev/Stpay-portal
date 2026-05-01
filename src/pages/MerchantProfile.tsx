@@ -44,6 +44,15 @@ function copy(text: string) {
   toast.success('Clé copiée dans le presse-papiers')
 }
 
+function formatIpAddress(ipAddress?: string | null) {
+  if (!ipAddress) return '—'
+
+  if (ipAddress === '::1') return '127.0.0.1'
+  if (ipAddress.startsWith('::ffff:')) return ipAddress.slice(7)
+
+  return ipAddress
+}
+
 const KYC_STATUS_LABELS: Record<string, { label: string; color: 'amber' | 'blue' | 'emerald' | 'red' }> = {
   Pending:     { label: 'En attente',          color: 'amber' },
   UnderReview: { label: 'En cours de vérification', color: 'blue' },
@@ -574,7 +583,7 @@ export default function MerchantProfile() {
                         <td className="px-4 py-2 text-slate-600 whitespace-nowrap">
                           {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short', timeStyle: 'medium' }).format(new Date(s.createdAt))}
                         </td>
-                        <td className="px-4 py-2 font-mono text-slate-700">{s.ipAddress ?? '—'}</td>
+                        <td className="px-4 py-2 font-mono text-slate-700">{formatIpAddress(s.ipAddress)}</td>
                         <td className="px-4 py-2">
                           {s.success ? (
                             <span className="text-emerald-600 font-semibold">✓ Connecté</span>

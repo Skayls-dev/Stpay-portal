@@ -56,6 +56,8 @@ interface TxResult {
   status: string
   amount: number
   duration: number
+  provider?: string
+  phone?: string
   escrow?: {
     escrowId?: string
     status?: string
@@ -63,6 +65,14 @@ interface TxResult {
     pickupCode?: string
     autoReleaseAt?: string
   }
+}
+
+interface HistoryEntry {
+  txId: string
+  status: string
+  amount: number
+  provider: string
+  at: string
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -130,6 +140,19 @@ async function initiatePayment(form: PaymentForm) {
 async function fetchStatus(txId: string) {
   const res = await client.get(`/api/Payment/${txId}`)
   return res.data as { status?: string; Status?: string; providerReference?: string }
+}
+
+async function cancelPayment(txId: string) {
+  try {
+    await client.delete(`/api/Payment/${txId}`)
+  } catch {
+    // Ignore — transaction may already be terminated
+  }
+}
+
+async function pushOrangePayment(txId: string) {
+  const res = await client.post(`/api/Payment/${txId}/push`, {})
+  return res.data as { pushed?: boolean }
 }
 
 // ─── Step indicator ───────────────────────────────────────────────────────────
@@ -513,6 +536,92 @@ function SimulatedPhone({
 
 // ─── Result card ──────────────────────────────────────────────────────────────
 
+// ─── Webhook payload preview ─────────────────────────────────────────────────
+
+function WebhookPayloadBlock({ result }: { result: TxResult }) {
+  const [open, setOpen] = React.useState(false)
+  const isTerminal = isSuccessfulPaymentStatus(result.status) || isFailedPaymentStatus(result.status)
+  if (!isTerminal || result.status === 'PENDING') return null
+
+  const event = isSuccessfulPaymentStatus(result.status) ? 'payment.completed' : 'payment.failed'
+  const payload = {
+    event,
+    transactionId: result.txId,
+    providerRef: result.providerRef ?? null,
+    status: result.status,
+    amount: result.amount,
+    currency: 'XAF',
+    provider: result.provider ?? 'MTN',
+    customer: { phoneNumber: result.phone ?? '—' },
+    merchant: { reference: 'TEST_SIM_001' },
+    timestamp: new Date().toISOString(),
+  }
+  const json = JSON.stringify(payload, null, 2)
+
+  const copyJson = async () => {
+    try { await navigator.clipboard.writeText(json); toast.success('Payload copié') }
+    catch { toast.error('Impossible de copier') }
+  }
+
+  return (
+    <div className="panel">
+      <button
+        type="button"
+        className="panel-header w-full text-left hover:bg-[var(--bg-subtle)] transition-colors"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className="panel-title">Payload webhook simulé <span className="text-[10px] font-mono text-[var(--text-3)]">{event}</span></span>
+        <span className="text-[10px] text-[var(--text-3)] ml-auto">{open ? '▲ Masquer' : '▼ Afficher'}</span>
+      </button>
+      {open && (
+        <div className="relative">
+          <pre className="p-3 text-[10px] font-mono leading-relaxed bg-[var(--bg-subtle)] overflow-x-auto text-[var(--text-1)] whitespace-pre-wrap">
+            {json}
+          </pre>
+          <button
+            type="button"
+            className="absolute top-2 right-2 btn-secondary text-[10px]"
+            onClick={copyJson}
+          >
+            Copier
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Session history ──────────────────────────────────────────────────────────
+
+function HistoryPanel({ entries }: { entries: HistoryEntry[] }) {
+  if (entries.length === 0) return null
+  return (
+    <div className="panel">
+      <div className="panel-header"><span className="panel-title">Historique de session</span></div>
+      <div className="divide-y divide-[var(--border-soft)]">
+        {entries.map((e, i) => {
+          const ok  = isSuccessfulPaymentStatus(e.status)
+          const err = isFailedPaymentStatus(e.status)
+          return (
+            <div key={i} className="flex items-center gap-3 px-4 py-2">
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0
+                ${ok  ? 'bg-[var(--green-bg)] text-[var(--green)]'
+                : err ? 'bg-[var(--red-bg)] text-[var(--red)]'
+                :        'bg-[var(--amber-bg)] text-[var(--amber)]'}`}>
+                {e.status}
+              </span>
+              <span className="font-mono text-[10px] text-[var(--text-3)] flex-1 truncate">{e.txId}</span>
+              <span className="text-[11px] text-[var(--text-2)] flex-shrink-0">{new Intl.NumberFormat('fr-FR').format(e.amount)} XAF</span>
+              <span className="text-[10px] text-[var(--text-3)] flex-shrink-0">{e.provider}</span>
+              <span className="text-[10px] text-[var(--text-4)] flex-shrink-0">{e.at}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function ResultCard({ result }: { result: TxResult | null }) {
   if (!result) return null
   const ok = isSuccessfulPaymentStatus(result.status)
@@ -538,6 +647,7 @@ function ResultCard({ result }: { result: TxResult | null }) {
         <span className="panel-title">Résultat de la transaction</span>
         <Badge ok={ok} />
       </div>
+      <WebhookPayloadBlock result={result} />
       <div className="divide-y divide-[var(--border-soft)]">
         {rows.map(([k, v]) => (
           <div key={k as string} className="flex items-start justify-between gap-4 px-4 py-2.5">
@@ -604,6 +714,14 @@ function Badge({ ok }: { ok: boolean }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+// Phone suffixes that trigger each scenario in MtnAdapter / OrangeAdapter (TestMode)
+// suffix 002 → fail, suffix 003 → timeout, any other → success
+const SCENARIO_PHONE_MAP: Record<string, string> = {
+  success: '237677123456',
+  failure: '237677123002',
+  timeout: '237677123003',
+}
+
 const SCENARIOS = [
   { value: 'success', label: 'Succès attendu',  sub: 'Le MockAdapter retournera SUCCESSFUL' },
   { value: 'failure', label: 'Échec attendu',   sub: 'Le MockAdapter retournera FAILED' },
@@ -639,6 +757,11 @@ export default function PaymentSimulator() {
   const [result,    setResult]    = useState<TxResult | null>(null)
   const [polling,   setPolling]   = useState(false)
   const [pollCount, setPollCount] = useState(0)
+  const [history,   setHistory]   = useState<HistoryEntry[]>([])
+
+  const pushHistory = useCallback((entry: HistoryEntry) => {
+    setHistory((prev) => [entry, ...prev].slice(0, 5))
+  }, [])
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -715,19 +838,22 @@ export default function PaymentSimulator() {
         if (isSuccessfulPaymentStatus(st)) {
           stopPolling()
           setState('success')
-          setResult({ txId: tid, providerRef: data.providerReference, status: st, amount: form.amount, duration: Date.now() - startedAt })
-          addLog('Webhook payment.completed déclenché', 'ok')
+          setResult({ txId: tid, providerRef: data.providerReference, status: st, amount: form.amount, duration: Date.now() - startedAt, provider: form.provider, phone: form.phone })
+          pushHistory({ txId: tid, status: st, amount: form.amount, provider: form.provider, at: nowTime() })
+          addLog('Webhook payment.completed déclenché — voir payload ↓', 'ok')
           addLog('Transaction terminée avec succès !', 'ok')
           toast.success('Paiement confirmé !')
         } else if (isFailedPaymentStatus(st)) {
           stopPolling()
           setState('failed')
-          setResult({ txId: tid, status: st, amount: form.amount, duration: Date.now() - startedAt })
-          addLog('Webhook payment.failed déclenché', 'err')
+          setResult({ txId: tid, status: st, amount: form.amount, duration: Date.now() - startedAt, provider: form.provider, phone: form.phone })
+          pushHistory({ txId: tid, status: st, amount: form.amount, provider: form.provider, at: nowTime() })
+          addLog('Webhook payment.failed déclenché — voir payload ↓', 'err')
           toast.error('Transaction échouée')
         } else if (count >= PAYMENT_POLL_MAX_ATTEMPTS) {
           stopPolling()
           setState('timeout')
+          pushHistory({ txId: tid, status: 'TIMEOUT', amount: form.amount, provider: form.provider, at: nowTime() })
           addLog('Timeout — 60s sans réponse définitive', 'warn')
           toast('Timeout de la simulation', { icon: '⏱' })
         }
@@ -781,20 +907,37 @@ export default function PaymentSimulator() {
     },
   })
 
-  const handleConfirm = (pin: string) => {
+  const handleConfirm = async (pin: string) => {
     if (!txId) return
     addLog(`PIN saisi (${pin.length} chiffres) — Confirmation envoyée`, 'ok')
-    addLog('Démarrage du polling statut (toutes les 5s, max 60s)', 'info')
     setState('confirming')
+
+    if (form.provider === 'ORANGE') {
+      addLog('Orange Money — envoi MP push au serveur…', 'info')
+      try {
+        await pushOrangePayment(txId)
+        addLog('POST /api/Payment/{id}/push — OK, push déclenché', 'ok')
+      } catch (e: unknown) {
+        addLog(`Erreur push Orange: ${e instanceof Error ? e.message : String(e)}`, 'warn')
+        addLog('Polling démarre quand même — le statut sera mis à jour par le provider', 'info')
+      }
+    }
+
+    addLog('Démarrage du polling statut (toutes les 5s, max 60s)', 'info')
     startPolling(txId)
   }
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     addLog('Paiement refusé par l\'utilisateur (bouton Annuler)', 'err')
-    addLog('Transaction marquée CANCELLED', 'err')
     stopPolling()
     setState('cancelled')
-    if (txId) setResult({ txId, status: 'CANCELLED', amount: form.amount, duration: Date.now() - startedAt })
+    if (txId) {
+      addLog(`DELETE /api/Payment/${txId.slice(-8)}… — annulation backend`, 'info')
+      await cancelPayment(txId)
+      addLog('Transaction annulée en base', 'err')
+      setResult({ txId, status: 'CANCELLED', amount: form.amount, duration: Date.now() - startedAt, provider: form.provider, phone: form.phone })
+      pushHistory({ txId, status: 'CANCELLED', amount: form.amount, provider: form.provider, at: nowTime() })
+    }
     toast.error('Paiement annulé')
   }
 
@@ -995,7 +1138,14 @@ export default function PaymentSimulator() {
                       <input type="radio" className="sr-only" value={value}
                              disabled={!canInitiate}
                              checked={form.scenario === value}
-                             onChange={() => canInitiate && setForm((f) => ({ ...f, scenario: value }))} />
+                             onChange={() => {
+                               if (!canInitiate) return
+                               setForm((f) => ({
+                                 ...f,
+                                 scenario: value,
+                                 phone: SCENARIO_PHONE_MAP[value] ?? f.phone,
+                               }))
+                             }} />
                       <span className={`text-[11px] font-bold
                         ${form.scenario === value
                           ? value === 'success' ? 'text-[var(--green)]'
@@ -1046,6 +1196,7 @@ export default function PaymentSimulator() {
 
           <EventLog entries={logs} />
           <ResultCard result={result} />
+          <HistoryPanel entries={history} />
         </div>
 
         {/* RIGHT: phone */}

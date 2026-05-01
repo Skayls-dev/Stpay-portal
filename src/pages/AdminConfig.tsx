@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { Badge, Button, Card } from '../components/ui'
 import { adminConfigApi } from '../lib/api/modules'
+import type { DataRetentionConfig } from '../lib/api/modules'
 import { authApi } from '../lib/api/auth'
 import {
   normalizeEmailList,
@@ -26,6 +27,30 @@ export default function AdminConfig() {
   const [resetTargetAdminId, setResetTargetAdminId] = useState('')
   const [resetActorTotpCode, setResetActorTotpCode] = useState('')
   const [resetReason, setResetReason] = useState('')
+
+  // ── Data-retention state ─────────────────────────────────────────────────
+  const { data: drData, isLoading: drLoading } = useQuery({
+    queryKey: ['admin-config', 'data-retention'],
+    queryFn: adminConfigApi.getDataRetentionConfig,
+  })
+
+  const [drDraft, setDrDraft] = useState<DataRetentionConfig | null>(null)
+  const drCurrent = drDraft ?? drData?.config ?? null
+
+  const setDrField = (field: keyof DataRetentionConfig, value: number) =>
+    setDrDraft(prev => ({ ...(prev ?? drData!.config), [field]: value }))
+
+  const saveDrMutation = useMutation({
+    mutationFn: (cfg: DataRetentionConfig) => adminConfigApi.saveDataRetentionConfig(cfg),
+    onSuccess: (res) => {
+      queryClient.setQueryData(['admin-config', 'data-retention'], res)
+      setDrDraft(null)
+      toast.success('Politique de rétention sauvegardée.')
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Impossible de sauvegarder la politique de rétention.')
+    },
+  })
 
   const { data: totpStatus } = useQuery({
     queryKey: ['admin-2fa-status'],
@@ -306,6 +331,51 @@ export default function AdminConfig() {
         </div>
       </Card>
 
+      {/* ── Data-retention policy ─────────────────────────────────────────── */}
+      <Card>
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-sm font-semibold text-slate-900">Politique de rétention des données</h2>
+          {drData?.fromDb && (
+            <Badge color="blue">Configuré en DB</Badge>
+          )}
+        </div>
+        <p className="text-xs text-muted mb-4">
+          Fenêtres de purge automatique (job Hangfire, 1er du mois à 02:00 UTC).
+          La valeur DB écrase <code>appsettings.json</code>. AuditLogs et données financières sont toujours exclus.
+        </p>
+
+        {drLoading || !drCurrent ? (
+          <p className="text-xs text-muted">Chargement…</p>
+        ) : (
+          <div className="space-y-0">
+            <DrField label="WebhookEvents" description="Événements livrés / échoués / abandonnés" value={drCurrent.webhookEventsDays} min={7} max={3650} onChange={(v) => setDrField('webhookEventsDays', v)} />
+            <DrField label="Notifications" description="Notifications envoyées / échouées" value={drCurrent.notificationsDays} min={7} max={3650} onChange={(v) => setDrField('notificationsDays', v)} />
+            <DrField label="DxAnalyticsEvents" description="Événements analytics DX" value={drCurrent.dxAnalyticsEventsDays} min={30} max={3650} onChange={(v) => setDrField('dxAnalyticsEventsDays', v)} />
+            <DrField label="Sessions portail marchand" description="Historique de connexion" value={drCurrent.sessionsDays} min={7} max={3650} onChange={(v) => setDrField('sessionsDays', v)} />
+            <DrField label="TransactionStatusHistories" description="Uniquement pour les transactions terminées" value={drCurrent.transactionStatusHistoryDays} min={30} max={3650} onChange={(v) => setDrField('transactionStatusHistoryDays', v)} />
+            <DrField label="FraudChecks" description="Vérifications antifraude des transactions terminées" value={drCurrent.fraudChecksDays} min={30} max={3650} onChange={(v) => setDrField('fraudChecksDays', v)} />
+            <DrField label="ReconciliationJobs" description="Jobs de réconciliation terminés / échoués" value={drCurrent.reconciliationJobsDays} min={7} max={3650} onChange={(v) => setDrField('reconciliationJobsDays', v)} />
+            <DrField label="Taille de lot (BatchSize)" description="Lignes supprimées par itération (anti-lock)" value={drCurrent.batchSize} unit="lignes" min={100} max={10000} onChange={(v) => setDrField('batchSize', v)} />
+          </div>
+        )}
+
+        <div className="mt-4 flex items-center gap-2">
+          <Button
+            onClick={() => drCurrent && saveDrMutation.mutate(drCurrent)}
+            disabled={!drCurrent || !drDraft || saveDrMutation.isPending}
+          >
+            Enregistrer
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => setDrDraft(null)}
+            disabled={!drDraft}
+          >
+            Annuler
+          </Button>
+        </div>
+      </Card>
+
       {/* Mode opératoire support */}
       <Card className="p-4">
         <h3 className="text-[15px] font-semibold mb-3">Mode opératoire — Support 2FA</h3>
@@ -345,6 +415,48 @@ export default function AdminConfig() {
           </section>
         </div>
       </Card>
+    </div>
+  )
+}
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+function DrField({
+  label,
+  description,
+  value,
+  unit = 'jours',
+  min,
+  max,
+  onChange,
+}: {
+  label: string
+  description?: string
+  value: number
+  unit?: string
+  min: number
+  max: number
+  onChange: (v: number) => void
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-2 border-b border-[var(--border-med)] last:border-0">
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-medium text-[var(--text-1)]">{label}</p>
+        {description && <p className="text-[11px] text-muted mt-0.5">{description}</p>}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <input
+          type="number"
+          min={min}
+          max={max}
+          value={value}
+          onChange={(e) => {
+            const v = parseInt(e.target.value, 10)
+            if (!isNaN(v) && v >= min && v <= max) onChange(v)
+          }}
+          className="w-24 rounded-[var(--r-sm)] border border-[var(--border-med)] px-2 py-1 text-[13px] text-right"
+        />
+        <span className="text-[12px] text-muted w-10">{unit}</span>
+      </div>
     </div>
   )
 }

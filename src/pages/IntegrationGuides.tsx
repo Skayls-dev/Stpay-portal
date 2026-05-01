@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { guideVideosApi, type GuideVideoConfig } from '../lib/api/modules'
+import { CodeSnippet } from '../components/ui'
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -336,7 +337,68 @@ if !constantTimeEquals(expected, received):
     ],
   },
   {
-    id: 'l1-support', num: 10, tag: 'Support',
+    id: 'api-key-training', num: 10, tag: 'Sécurité',
+    title: 'Formation — Gestion sécurisée des clés API',
+    tagline: 'Stocker dans des variables d\'environnement, piloter la rotation, ne jamais committer.',
+    blocks: [
+      { type: 'p' as const, content: 'Une clé API compromise permet à n\'importe qui d\'initier des paiements en votre nom ou de lire toutes vos transactions. Ces trois pratiques non négociables réduisent drastiquement ce risque et s\'appliquent à n\'importe quelle stack technique.' },
+      { type: 'h3' as const, content: 'Stockage par variables d\'environnement' },
+      { type: 'p', content: 'N\'inscrivez jamais une clé API en dur dans votre code source — ni côté frontend, ni côté backend. Utilisez des variables d\'environnement ou un gestionnaire de secrets (Vault, AWS Secrets Manager, Doppler, etc.) pour injecter la valeur au démarrage de l\'application.' },
+      { type: 'code', content: `# .env (à ne jamais committer — ajoutez-le dans .gitignore)
+STPAY_API_KEY=sk_live_xxxxxxxxxxxxxxxx
+STPAY_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxx` },
+      { type: 'code', content: `// Node.js — lecture depuis l'environnement
+const apiKey = process.env.STPAY_API_KEY;
+if (!apiKey) throw new Error("STPAY_API_KEY manquante");
+
+// Python
+import os
+api_key = os.environ["STPAY_API_KEY"]` },
+      { type: 'ul', content: [
+        'Backend : variables d\'environnement du process ou secret manager',
+        'Mobile : keystore Android / keychain iOS — jamais dans le bundle',
+        'CI/CD : variables "protégées" sur GitLab/GitHub — masquées dans les logs',
+        'Docker/Kubernetes : secrets montés en volume ou injectés via Helm',
+      ] },
+      { type: 'h3', content: 'Rotation obligatoire tous les 90 jours' },
+      { type: 'p', content: 'Planifiez une alerte calendrier récurrente tous les 90 jours. La rotation se fait sans interruption de service : générez la nouvelle clé depuis le portail, déployez-la, puis révoquez l\'ancienne.' },
+      { type: 'ol', content: [
+        'Ouvrir le portail marchand → Clés API → Générer une nouvelle clé',
+        'Mettre à jour la variable d\'environnement sur tous vos serveurs',
+        'Vérifier que les appels API passent avec la nouvelle clé (health check)',
+        'Révoquer l\'ancienne clé depuis le portail — elle devient invalide immédiatement',
+        'Documenter la date de rotation et planifier la suivante',
+      ] },
+      { type: 'p', content: 'En cas de suspicion de fuite — même minime — révoquez immédiatement sans attendre l\'échéance des 90 jours. La clé est invalidée dans la seconde. Créez-en une nouvelle et déployez avant d\'en informer votre équipe.' },
+      { type: 'h3', content: 'Ne jamais committer une clé' },
+      { type: 'p', content: 'Un commit accidentel d\'une clé dans Git est une fuite publique, même si vous supprimez le fichier ensuite — l\'historique reste accessible. Activez la détection automatique avant que cela n\'arrive.' },
+      { type: 'ul', content: [
+        'Activez le secret scanning GitHub (Settings → Security → Secret scanning)',
+        'Ajoutez un hook pre-commit avec detect-secrets ou git-secrets pour bloquer en local',
+        'Mettez tous vos fichiers .env dans .gitignore dès la création du dépôt',
+        'Revoyez l\'historique git si un secret a déjà été commité : git log -S "sk_live"',
+      ] },
+      { type: 'code', content: `# .gitignore — exemple minimal
+.env
+.env.local
+.env.*.local
+*.pem
+secrets/` },
+      { type: 'p', content: 'Si un commit accidentel a déjà eu lieu : révoquez la clé immédiatement, purgez l\'historique avec git filter-repo, auditez les accès effectués pendant la fenêtre d\'exposition, puis régénérez les secrets affectés.' },
+      { type: 'h3', content: 'Checklist formation' },
+      { type: 'checklist', content: [
+        'Aucune clé en dur dans le code — vérification via grep ou secret scanning',
+        'Fichiers .env dans .gitignore depuis le début du projet',
+        'Secret scanning activé sur le dépôt (GitHub / GitLab)',
+        'Hook pre-commit configuré pour bloquer les commits contenant des secrets',
+        'Rotation planifiée dans les 90 prochains jours (alerte calendrier posée)',
+        'Procédure de révocation connue de tous les membres de l\'équipe',
+        'Politique de rotation documentée dans le README ou le wiki interne',
+      ] },
+    ],
+  },
+  {
+    id: 'l1-support', num: 11, tag: 'Support',
     title: 'Support L1 pour juniors',
     tagline: 'Résoudre 80 % des incidents courants en moins de 10 minutes, sans escalader.',
     blocks: [
@@ -383,27 +445,7 @@ function TagBadge({ tag }: { tag: Tag }) {
 }
 
 function CodeBlock({ code }: { code: string }) {
-  const [copied, setCopied] = useState(false)
-  const copy = () => {
-    navigator.clipboard.writeText(code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1800)
-  }
-  return (
-    <div className="relative group rounded-[10px] overflow-hidden border border-[var(--border)]"
-         style={{ background: '#0f172a' }}>
-      <button onClick={copy}
-              className="absolute top-2.5 right-3 opacity-0 group-hover:opacity-100 transition-opacity
-                         text-[10px] font-semibold px-2 py-0.5 rounded-[5px]"
-              style={{ background: '#1e293b', color: copied ? '#4ade80' : '#94a3b8' }}>
-        {copied ? '✓ Copié' : 'Copier'}
-      </button>
-      <pre className="overflow-x-auto px-4 py-3.5 text-[12px] leading-relaxed m-0"
-           style={{ color: '#e2e8f0', fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace" }}>
-        <code>{code}</code>
-      </pre>
-    </div>
-  )
+  return <CodeSnippet code={code} title="Exemple" preClassName="text-[12px] leading-relaxed" />
 }
 
 function CheckItem({ text, defaultChecked = false }: { text: string; defaultChecked?: boolean }) {
