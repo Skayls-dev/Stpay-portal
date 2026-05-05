@@ -62,7 +62,7 @@ client.interceptors.response.use(
 
     if (error?.response?.status === 401 && !isPublicAuthCall && !isApiKeyAuthFailure) {
       AUTH_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key))
-      window.location.href = '/choose-portal'
+      window.location.href = '/login'
     }
     const errorCode = String(error?.response?.data?.code || error?.response?.data?.errorCode || '')
     const isPsiRequired = error?.response?.status === 403 && errorCode === 'PSI_REQUIRED'

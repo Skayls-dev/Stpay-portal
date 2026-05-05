@@ -21,7 +21,6 @@ import Traceability from './pages/Traceability';
 import MerchantProfile from './pages/MerchantProfile';
 import AcceptInvite from './pages/AcceptInvite';
 import PayoutAccounts from './pages/PayoutAccounts';
-import PortalSelect from './pages/PortalSelect';
 import LandingPage from './pages/LandingPage';
 const DeveloperPortal  = React.lazy(() => import('./pages/DeveloperPortal'));
 const PaymentSimulator = React.lazy(() => import('./pages/PaymentSimulator'));
@@ -71,8 +70,8 @@ function App() {
       />
       <React.Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center', color: '#999', fontSize: '13px' }}>Chargement...</div>}>
       <Routes>
-        <Route path="/login"          element={<Navigate to="/choose-portal" replace />} />
-        <Route path="/choose-portal"  element={<PortalSelect />} />
+        <Route path="/login"          element={<Navigate to="/merchant/login" replace />} />
+        <Route path="/choose-portal"  element={<Navigate to="/merchant/login" replace />} />
         <Route path="/merchant/login" element={<Login portal="merchant" />} />
         <Route path="/admin/login"    element={<Login portal="admin" />} />
         <Route path="/register"       element={<MerchantRegister />} />

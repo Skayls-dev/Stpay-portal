@@ -552,7 +552,7 @@ export default function LandingPage() {
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4">
           <p className="text-[12px] text-[var(--text-3)]">{t.footerTagline}</p>
           <div className="flex gap-2">
-            <Link to="/choose-portal" className="btn-secondary">{t.portals}</Link>
+            <Link to="/login" className="btn-secondary">{t.portals}</Link>
             <Link to="/demo/webshop" className="btn-secondary">{t.webshopDemo}</Link>
           </div>
         </div>

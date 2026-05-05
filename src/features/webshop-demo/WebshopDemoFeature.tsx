@@ -366,7 +366,7 @@ export default function WebshopDemoFeature() {
               <p className="mt-1 text-[13px] text-[var(--text-2)]">Feature isolee pour montrer l'integration checkout sans login.</p>
             </div>
             <div className="flex items-center gap-2">
-              <Link to="/choose-portal" className="btn-secondary">Retour portail</Link>
+              <Link to="/login" className="btn-secondary">Retour connexion</Link>
               <span className="st-badge st-badge-blue">Sandbox</span>
             </div>
           </div>

@@ -234,7 +234,7 @@ export default function EscrowDemo() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Link to="/choose-portal" className="btn-secondary">← Retour portail</Link>
+              <Link to="/login" className="btn-secondary">← Retour connexion</Link>
               <button type="button" className="btn-secondary" onClick={() => reset()}>Reset</button>
               <span className="st-badge st-badge-orange">Sandbox</span>
             </div>
