@@ -11,6 +11,7 @@ import type { Transaction, MerchantApp } from '../lib/api/modules'
 
 const PROVIDERS = ['all','MTN','ORANGE']
 const STATUSES  = ['all','pending','processing','completed','failed','cancelled']
+const TRANSACTION_TYPES = ['all', 'payment', 'escrow'] as const
 
 const PROV_CLS: Record<string, string> = {
   MTN:'prov-mtn', ORANGE:'prov-ora',
@@ -228,9 +229,9 @@ export default function Transactions() {
   const [search, setSearch] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo]     = useState('')
-  const [escrowOnly, setEscrowOnly] = useState(false)
+  const [transactionTypeFilter, setTransactionTypeFilter] = useState<(typeof TRANSACTION_TYPES)[number]>('all')
   const [selected, setSelected] = useState<Transaction|null>(null)
-  const isFiltered = statusFilter!=='all'||providerFilter!=='all'||!!merchantFilter||!!search||!!dateFrom||!!dateTo||escrowOnly||!!appFilter
+  const isFiltered = statusFilter!=='all'||providerFilter!=='all'||!!merchantFilter||!!search||!!dateFrom||!!dateTo||transactionTypeFilter!=='all'||!!appFilter
 
   const { data: apps = [] } = useQuery<MerchantApp[]>({
     queryKey: ['merchant-apps'],
@@ -286,7 +287,12 @@ export default function Transactions() {
         (isNum && String(Math.round(tx.amount)).includes(q))
       )
     }
-    if (escrowOnly) result = result.filter(tx => !!tx.escrow?.escrowId)
+    if (transactionTypeFilter === 'escrow') {
+      result = result.filter(tx => !!tx.escrow?.escrowId)
+    }
+    if (transactionTypeFilter === 'payment') {
+      result = result.filter(tx => !tx.escrow?.escrowId)
+    }
     return result
   })()
 
@@ -330,6 +336,12 @@ export default function Transactions() {
             <option key={p} value={p}>{p==='all'?'Tous les opérateurs':p}</option>
           ))}
         </Select>
+        <Select className="w-40 h-8 text-[12px]" value={transactionTypeFilter}
+                onChange={(e) => setTransactionTypeFilter(e.target.value as (typeof TRANSACTION_TYPES)[number])}>
+          <option value="all">Tous les types</option>
+          <option value="payment">Paiement simple</option>
+          <option value="escrow">Escrow</option>
+        </Select>
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] text-[var(--text-4)] whitespace-nowrap">Du</span>
           <Input type="date" className="h-8 text-[12px] w-36"
@@ -353,23 +365,8 @@ export default function Transactions() {
             ))}
           </Select>
         )}
-        <button
-          type="button"
-          onClick={() => setEscrowOnly(v => !v)}
-          className={`h-8 px-3 rounded-[6px] text-[11px] font-semibold flex items-center gap-1.5 border transition-colors ${
-            escrowOnly
-              ? 'bg-emerald-500/10 text-emerald-700 border-emerald-300/60 hover:bg-emerald-500/20'
-              : 'bg-white text-[var(--text-3)] border-[var(--border)] hover:bg-[var(--bg-subtle)]'
-          }`}
-        >
-          <svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4"/>
-            <path d="M5.5 7V5.8a2.5 2.5 0 115 0V7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-          </svg>
-          Escrow
-        </button>
         {isFiltered && (
-          <button onClick={() => { setStatusFilter('all'); setProviderFilter('all'); setMerchantFilter(''); setSearch(''); setDateFrom(''); setDateTo(''); setEscrowOnly(false); setAppFilter('') }}
+          <button onClick={() => { setStatusFilter('all'); setProviderFilter('all'); setMerchantFilter(''); setSearch(''); setDateFrom(''); setDateTo(''); setTransactionTypeFilter('all'); setAppFilter('') }}
                   className="h-8 px-3 rounded-[6px] text-[11px] font-semibold flex items-center gap-1.5
                              bg-[var(--red-bg)] text-[var(--red)] border border-[var(--red-border)]
                              hover:bg-red-100 transition-colors">
