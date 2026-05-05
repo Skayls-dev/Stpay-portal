@@ -371,9 +371,9 @@ function EscrowCard({ item, role, isSuperAdmin }: { item: EscrowItem; role: 'mer
   }
 
   return (
-    <div className="bg-[var(--bg-raised)] border border-[var(--border-soft)]
+    <div className="bg-white border border-[var(--border)] shadow-[0_2px_8px_rgba(0,0,0,0.08)]
                     rounded-[var(--radius-md)] p-4 flex flex-col gap-4
-                    hover:border-[var(--border-medium)] transition-colors">
+                    hover:shadow-[0_4px_16px_rgba(0,0,0,0.12)] hover:border-[var(--border-medium)] transition-all">
 
       {/* Header row */}
       <div className="flex items-start justify-between gap-3">
