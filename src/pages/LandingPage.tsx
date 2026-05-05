@@ -300,15 +300,7 @@ export default function LandingPage() {
               <Link to="/demo/webshop" className="btn-secondary">{t.webshopDemo}</Link>
             </div>
 
-            {/* Metrics */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {t.metrics.map((m, idx) => (
-                <div key={m.label} className={`rounded-[12px] border border-[var(--border)] bg-white p-3.5 shadow-[0_10px_28px_rgba(0,0,0,0.1)] landing-reveal landing-delay-${idx + 1}`}>
-                  <p className="text-[20px] font-extrabold leading-tight text-[var(--text-1)]">{m.value}</p>
-                  <p className="mt-0.5 text-[10px] font-medium text-[var(--text-2)]">{m.label}</p>
-                </div>
-              ))}
-            </div>
+
           </div>
             </div>
           </div>
