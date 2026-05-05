@@ -78,8 +78,11 @@ export interface Transaction {
   amount: number
   currency: string
   status: string
+  customerPhone?: string
+  customerName?: string
   merchantId?: string
   merchantName?: string
+  applicationName?: string
   createdAt?: string
   updatedAt?: string
   description?: string
@@ -258,9 +261,18 @@ interface TransactionSummaryDto {
   amount?: number
   currency: string
   status: string
+  customerPhone?: string
+  customerName?: string
   merchantId?: string
   merchantName?: string
+  applicationName?: string
   merchantRef?: string
+  escrow?: {
+    escrowId?: string
+    status?: string
+    releaseMode?: string
+    autoReleaseAt?: string
+  }
   createdAt?: string
   completedAt?: string
 }
@@ -304,8 +316,20 @@ const toTransactionFromSummary = (item: TransactionSummaryDto): Transaction => (
   amount: Number(item.amount ?? 0),
   currency: item.currency,
   status: item.status,
+  customerPhone: item.customerPhone,
+  customerName: item.customerName,
   merchantId: item.merchantId ?? item.merchantRef,
   merchantName: item.merchantName,
+  applicationName: item.applicationName,
+  escrow:
+    item.escrow?.escrowId && item.escrow?.status && item.escrow?.releaseMode
+      ? {
+          escrowId: item.escrow.escrowId,
+          status: item.escrow.status,
+          releaseMode: item.escrow.releaseMode,
+          autoReleaseAt: item.escrow.autoReleaseAt,
+        }
+      : undefined,
   createdAt: item.createdAt,
   updatedAt: item.completedAt,
 })
