@@ -298,7 +298,6 @@ export default function LandingPage() {
             <div className="flex flex-wrap items-center gap-3">
               <Link to="/register" className="btn-primary px-5 py-2.5 text-[14px]">{t.createMerchant}</Link>
               <Link to="/demo/webshop" className="btn-secondary">{t.webshopDemo}</Link>
-              <Link to="/admin/login" className="text-[12px] font-semibold text-[var(--text-2)] hover:text-[var(--text-1)] transition-colors">{t.adminLogin}</Link>
             </div>
 
             {/* Metrics */}
