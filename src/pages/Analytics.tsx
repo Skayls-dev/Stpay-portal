@@ -10,6 +10,10 @@ import { useAuth } from '../hooks/useAuth'
 import { analyticsApi, transactionsApi } from '../lib/api/modules'
 import type { Transaction } from '../lib/api/modules'
 import { formatDxDuration, getDxAnalyticsSummary, subscribeDxAnalytics, type DxAnalyticsSummary } from '../lib/dxAnalytics'
+import MerchantScoreWidget from '../components/analytics/MerchantScoreWidget'
+import VatReportWidget from '../components/analytics/VatReportWidget'
+import PnlWidget from '../components/analytics/PnlWidget'
+import ProviderIntelligenceWidget from '../components/analytics/ProviderIntelligenceWidget'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -233,6 +237,28 @@ export default function Analytics() {
         <Kpi label="Transactions"     value={totalTx.toLocaleString('fr-FR')} sub="sur la période" />
         <Kpi label="Taux de succès"   value={`${succRate} %`}        sub="transactions réussies"  color="text-[var(--green)]" />
         <Kpi label="Panier moyen"     value={fmtM(avgTx)}           sub="XAF par transaction" />
+      </div>
+
+      {role === 'merchant' && (
+        <div className="col-span-full">
+          <MerchantScoreWidget />
+        </div>
+      )}
+
+      {role === 'merchant' && (
+        <div className="col-span-full">
+          <VatReportWidget />
+        </div>
+      )}
+
+      {role === 'merchant' && (
+        <div className="col-span-full">
+          <PnlWidget />
+        </div>
+      )}
+
+      <div className="col-span-full">
+        <ProviderIntelligenceWidget />
       </div>
 
       <div className="panel">

@@ -4,8 +4,6 @@ import toast from 'react-hot-toast'
 import { authApi } from '../lib/api/auth'
 import { useAuthStore } from '../stores/authStore'
 import { useAuth } from '../hooks/useAuth'
-// @ts-ignore — Vite raw import
-import psiRaw from '/public/PSI-STPAY-2025-001.md?raw'
 
 type MerchantPsiGateProps = {
   standalone?: boolean
@@ -211,11 +209,25 @@ export default function MerchantPsiGate({ standalone = true }: MerchantPsiGatePr
   const navigate = useNavigate()
   const { user } = useAuth()
   const { login, setPsiAccepted } = useAuthStore()
+  const [psiRaw, setPsiRaw] = useState<string>('')
   const parsed = parsePsiMarkdown(psiRaw)
 
   const [checked, setChecked] = useState(false)
   const [loading, setLoading] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
+
+  useEffect(() => {
+    fetch('/PSI-STPAY-2025-001.md')
+      .then((res) => {
+        if (!res.ok) throw new Error('PSI_NOT_FOUND')
+        return res.text()
+      })
+      .then((text) => setPsiRaw(text))
+      .catch(() => {
+        // Keep an empty fallback; parser will render a minimal structure.
+        setPsiRaw('')
+      })
+  }, [])
 
   useEffect(() => {
     if (!user || user.role !== 'merchant') return

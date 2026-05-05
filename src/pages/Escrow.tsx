@@ -7,6 +7,7 @@ import { useAuth } from '../hooks/useAuth'
 import { escrowApi, appsApi } from '../lib/api/modules'
 import type { MerchantApp } from '../lib/api/modules'
 import { Badge, Button } from '../components/ui'
+import EscrowAccountingWidget from '../components/analytics/EscrowAccountingWidget'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -739,6 +740,12 @@ export default function Escrow() {
       </div>
 
       {/* ── Cards grid ── */}
+      {role === 'merchant' && (
+        <div className="mb-6">
+          <EscrowAccountingWidget />
+        </div>
+      )}
+
       {isLoading ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {Array.from({ length: 6 }).map((_, i) => (

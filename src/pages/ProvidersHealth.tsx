@@ -54,6 +54,15 @@ export default function ProvidersHealth() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Santé des fournisseurs</h1>
+            <p className="text-[12px] text-[var(--text-muted)] mt-1">
+              Vue opérationnelle temps réel.{' '}
+              <a
+                href="/merchant/analytics"
+                className="text-[var(--orange)] hover:underline font-medium"
+              >
+                Voir l'analyse historique des providers →
+              </a>
+            </p>
             <p className="text-sm text-muted">
               {provFetching ? 'Actualisation…' : `Mise à jour toutes les ${POLL_INTERVAL_PROVIDERS / 1000}s`}
             </p>

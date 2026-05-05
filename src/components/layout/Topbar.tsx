@@ -1,5 +1,5 @@
 // src/components/layout/Topbar.tsx
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { IconSearch, IconPlus } from '../icons/NavIcons'
 
@@ -28,6 +28,20 @@ export default function Topbar() {
   const { isSuperAdmin } = useAuth()
   const navigate = useNavigate()
   const title = usePageTitle()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const searchValue = searchParams.get('q') ?? ''
+
+  const onSearchChange = (value: string) => {
+    const next = new URLSearchParams(searchParams)
+    const normalized = value.trim()
+
+    if (normalized) {
+      next.set('q', value)
+    } else {
+      next.delete('q')
+    }
+    setSearchParams(next, { replace: true })
+  }
 
   return (
     <header className="h-[50px] min-h-[50px] flex items-center px-5 gap-3
@@ -43,10 +57,19 @@ export default function Topbar() {
       )}
 
       <div className="flex items-center gap-2">
-        <button className="btn-secondary">
+        <label
+          className="inline-flex items-center gap-2 rounded-[10px] border border-[var(--text-1)]
+                     bg-white px-3 py-1.5"
+          aria-label="Rechercher"
+        >
           <IconSearch />
-          Rechercher
-        </button>
+          <input
+            value={searchValue}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Rechercher"
+            className="w-36 bg-transparent text-[13px] text-[var(--text-2)] outline-none placeholder:text-[var(--text-3)]"
+          />
+        </label>
         {isSuperAdmin && (
           <button className="btn-primary" onClick={() => navigate('/demo/webshop')}>
             <IconPlus />

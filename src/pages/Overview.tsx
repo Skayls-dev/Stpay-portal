@@ -1,7 +1,7 @@
 ﻿// src/pages/Overview.tsx
 import React, { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { analyticsApi, transactionsApi, POLL_INTERVAL_TRANSACTIONS } from '../lib/api/modules'
 import { Badge, DataTable } from '../components/ui'
@@ -122,6 +122,13 @@ function ProviderBadge({ name }: { name: string }) {
 // ─── Spark bar ────────────────────────────────────────────────────────────────
 const SPARK_LABELS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 
+const OVERVIEW_PERIODS = [
+  { key: 'overview', label: 'Aperçu', days: 14 },
+  { key: '7d', label: '7 jours', days: 7 },
+  { key: '30d', label: '30 jours', days: 30 },
+  { key: 'all', label: 'Tout', days: null as number | null },
+]
+
 function SparkBar({ data }: { data: number[] }) {
   const max = Math.max(...data, 1)
   return (
@@ -149,7 +156,6 @@ function SparkBar({ data }: { data: number[] }) {
   )
 }
 
-1
 const PROVIDERS = [
   { name: 'MTN MoMo',     short: 'MTN', pct: 63, vol: 89_200_000, bar: '#FFC700' },
   { name: 'Orange Money', short: 'ORA', pct: 25, vol: 35_800_000, bar: '#FF6600' },
@@ -360,11 +366,11 @@ const RECENT_COLS: DataTableColumn<Transaction>[] = [
 // â”€â”€â”€ Main â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function Overview() {
   const { role, user, isSuperAdmin } = useAuth()
+  const [searchParams] = useSearchParams()
+  const [activePeriod, setActivePeriod] = useState<(typeof OVERVIEW_PERIODS)[number]['key']>('overview')
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ['stats', role, user.merchantId],
-    queryFn: () => analyticsApi.stats(role, user.merchantId),
-  })
+  const daysFilter = OVERVIEW_PERIODS.find((p) => p.key === activePeriod)?.days ?? 14
+  const searchTerm = (searchParams.get('q') ?? '').trim().toLowerCase()
 
   const { data: recent = [], isLoading: recentLoading } = useQuery({
     queryKey: ['recent-transactions', role, user.merchantId],
@@ -372,19 +378,74 @@ export default function Overview() {
     refetchInterval: POLL_INTERVAL_TRANSACTIONS,
   })
 
-  const { data: topMerchants = [] } = useQuery({
-    queryKey: ['top-merchants'],
-    queryFn: analyticsApi.topMerchants,
-    enabled: isSuperAdmin,
+  const { data: allTransactions = [], isLoading: allLoading } = useQuery({
+    queryKey: ['overview-transactions', role, user.merchantId],
+    queryFn: () => transactionsApi.list({ merchantId: role === 'merchant' ? user.merchantId : undefined }),
+    refetchInterval: POLL_INTERVAL_TRANSACTIONS,
   })
 
+  const filteredTransactions = useMemo(() => {
+    const now = Date.now()
+    const minTs = daysFilter == null ? null : now - daysFilter * 24 * 60 * 60 * 1000
+
+    return allTransactions
+      .filter((tx) => {
+        const txTs = tx.createdAt ? new Date(tx.createdAt).getTime() : 0
+        if (minTs != null && txTs < minTs) return false
+
+        if (!searchTerm) return true
+        const haystack = [
+          tx.transactionId,
+          tx.id,
+          tx.provider,
+          tx.status,
+          tx.merchantName,
+          tx.merchantId,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        return haystack.includes(searchTerm)
+      })
+      .sort((a, b) => {
+        const aTs = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        const bTs = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        return bTs - aTs
+      })
+  }, [allTransactions, daysFilter, searchTerm])
+
+  const displayedRecent = useMemo(() => filteredTransactions.slice(0, 8), [filteredTransactions])
+
   const kpis = useMemo(() => {
-    if (!stats) return null
-    const total = stats.totalAmount ?? 0
-    const rate  = stats.total > 0
-      ? Math.round((stats.completed / stats.total) * 1000) / 10 : 0
-    return { total, rate }
-  }, [stats])
+    const total = filteredTransactions
+      .filter((tx) => ['completed', 'success', 'successful'].includes(tx.status.toLowerCase()))
+      .reduce((sum, tx) => sum + tx.amount, 0)
+    const completed = filteredTransactions
+      .filter((tx) => ['completed', 'success', 'successful'].includes(tx.status.toLowerCase()))
+      .length
+    const rate = filteredTransactions.length > 0
+      ? Math.round((completed / filteredTransactions.length) * 1000) / 10
+      : 0
+    return {
+      total,
+      totalCount: filteredTransactions.length,
+      rate,
+    }
+  }, [filteredTransactions])
+
+  const topMerchants = useMemo(() => {
+    if (!isSuperAdmin) return [] as { merchant: string; amount: number }[]
+    const totals = new Map<string, number>()
+    filteredTransactions.forEach((tx) => {
+      const key = tx.merchantName || tx.merchantId || 'Marchand inconnu'
+      totals.set(key, (totals.get(key) || 0) + tx.amount)
+    })
+
+    return Array.from(totals.entries())
+      .map(([merchant, amount]) => ({ merchant, amount }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5)
+  }, [filteredTransactions, isSuperAdmin])
 
   return (
     <div className="space-y-4">
@@ -408,13 +469,14 @@ export default function Overview() {
       {/* Period tabs */}
       <div className="flex items-center justify-between">
         <div className="flex gap-0.5 bg-[var(--border)] p-[3px] rounded-[7px]">
-          {['Aperçu', '7 jours', '30 jours', 'Tout'].map((t, i) => (
-            <button key={t}
+          {OVERVIEW_PERIODS.map((period) => (
+            <button key={period.key}
+                    onClick={() => setActivePeriod(period.key)}
                     className={`px-3.5 py-1.5 rounded-[5px] text-[12px] transition-colors
-                      ${i === 0
+                      ${activePeriod === period.key
                         ? 'bg-white font-semibold text-[var(--text-1)] shadow-sm'
                         : 'text-[var(--text-2)] hover:text-[var(--text-1)]'}`}>
-              {t}
+              {period.label}
             </button>
           ))}
         </div>
@@ -422,7 +484,7 @@ export default function Overview() {
       </div>
 
       {/* KPI grid */}
-      {statsLoading ? (
+      {allLoading ? (
         <div className="grid grid-cols-4 gap-2.5">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="kpi-card animate-pulse">
@@ -431,7 +493,7 @@ export default function Overview() {
             </div>
           ))}
         </div>
-      ) : stats ? (
+      ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
           <KpiCard label="Volume traité"
             value={kpis ? `${(kpis.total / 1_000_000).toFixed(1)}M` : '—'}
@@ -441,7 +503,7 @@ export default function Overview() {
             icon={<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1.5v10M3.5 4.5l3-3 3 3M3.5 8.5l3 3 3-3" stroke="var(--orange)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>}
           />
           <KpiCard label="Transactions"
-            value={new Intl.NumberFormat('fr-FR').format(stats.total)}
+            value={new Intl.NumberFormat('fr-FR').format(kpis.totalCount)}
             delta={{ text: '+8.2% ce mois', up: true }}
             iconBg="bg-[var(--blue-bg)]"
             icon={<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1.5" y="3.5" width="10" height="6" rx="1.5" stroke="var(--blue)" strokeWidth="1.2"/><path d="M4 6.5h5M4 8.5h2" stroke="var(--blue)" strokeWidth="1.2" strokeLinecap="round"/></svg>}
@@ -460,7 +522,7 @@ export default function Overview() {
             icon={<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1.5" y="4" width="10" height="8" rx="1.5" stroke="var(--amber)" strokeWidth="1.2"/><path d="M4.5 4V3a2.5 2.5 0 015 0v1" stroke="var(--amber)" strokeWidth="1.2" strokeLinecap="round"/></svg>}
           />
         </div>
-      ) : null}
+      )}
 
       {/* Content grid */}
       <div className="grid gap-3 lg:grid-cols-[1fr_250px]">
@@ -468,15 +530,15 @@ export default function Overview() {
         <div className="panel">
           <div className="panel-header">
             <span className="panel-title">{isSuperAdmin ? 'Transactions globales' : 'Transactions récentes'}</span>
-            <span className="panel-link">{isSuperAdmin ? 'Analyse globale â†’' : 'Voir tout'}</span>
+            <span className="panel-link">{isSuperAdmin ? 'Analyse globale →' : 'Voir tout'}</span>
           </div>
           <SparkBar data={[40, 60, 30, 80, 55, 70, 90]} />
-          {recentLoading ? (
+          {recentLoading || allLoading ? (
             <p className="p-4 text-[13px] text-[var(--text-3)]">Chargement…</p>
           ) : (
             <DataTable<Transaction>
               columns={RECENT_COLS}
-              data={recent}
+              data={displayedRecent}
               rowKey={(tx) => tx.id}
               emptyText="Aucune transaction récente"
             />
@@ -489,7 +551,7 @@ export default function Overview() {
           {isSuperAdmin ? (
             <>
               <TopMerchantsPanel merchants={topMerchants} />
-              <AdminIncidentsPanel recent={recent} />
+              <AdminIncidentsPanel recent={displayedRecent} />
               <AdminOpsPanel />
             </>
           ) : (

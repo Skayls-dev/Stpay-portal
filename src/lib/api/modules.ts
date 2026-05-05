@@ -890,6 +890,23 @@ export const settlementsApi = {
     return response.data as SettlementTransactionItem[]
   },
 
+  async exportCsv(settlementId: string): Promise<void> {
+    const response = await client.get(
+      `/api/settlements/${settlementId}/export`,
+      { responseType: 'blob' },
+    )
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    const disposition = response.headers['content-disposition'] ?? ''
+    const match = disposition.match(/filename="?([^"]+)"?/) 
+    link.download = match?.[1] ?? `settlement_${settlementId}.csv`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  },
+
   async trigger(input: { merchantId: string; currency: string; notes?: string; payoutAccountId?: string }) {
     const response = await client.post('/api/settlements/trigger', input)
     return response.data as {
@@ -1105,5 +1122,158 @@ export const guideVideosApi = {
   ): Promise<GuideVideoConfig> {
     const response = await client.put(`/api/guide-videos/${guideId}`, payload)
     return response.data as GuideVideoConfig
+  },
+}
+
+export interface EscrowAccountingSummary {
+  currency: string
+  fundsHeld: number
+  activeEscrowCount: number
+  releasedThisMonth: number
+  releasedCountMonth: number
+  refundedThisMonth: number
+  refundedCountMonth: number
+  openDisputeCount: number
+  disputedAmount: number
+  disputeRate: number
+  avgCycleDaysReleased: number | null
+  avgCycleDaysDisputed: number | null
+  pickupCodeCount: number
+  autoTimeoutCount: number
+  dualConfirmCount: number
+}
+
+export const escrowAccountingApi = {
+  async summary(): Promise<EscrowAccountingSummary> {
+    const response = await client.get('/api/escrow/accounting-summary')
+    return response.data as EscrowAccountingSummary
+  },
+}
+
+export interface ProviderStats {
+  provider: string
+  totalTransactions: number
+  successCount: number
+  failedCount: number
+  pendingCount: number
+  successRate: number
+  totalVolume: number
+  avgTransactionAmount: number
+  avgDurationSeconds: number | null
+  volumeShare: number
+}
+
+export interface ProviderHourlyBucket {
+  provider: string
+  hour: number         // 0-23
+  count: number
+  successRate: number
+}
+
+export interface ProviderIntelligenceResponse {
+  periodFrom: string
+  periodTo: string
+  providers: ProviderStats[]
+  hourlyHeatmap: ProviderHourlyBucket[]
+  dominantProvider: string
+  mostReliableProvider: string
+}
+
+export const providerIntelligenceApi = {
+  async get(days = 30): Promise<ProviderIntelligenceResponse> {
+    const response = await client.get(
+      `/api/analytics/provider-intelligence?days=${days}`
+    )
+    return response.data as ProviderIntelligenceResponse
+  },
+}
+
+export interface MerchantScoreDto {
+  score: number
+  tier: string
+  tpvScore: number
+  successRateScore: number
+  seniorityScore: number
+  disputeScore: number
+  regularityScore: number
+  tpv90d: number
+  successRate90d: number
+  disputeRate90d: number
+  accountAgeDays: number
+  transactionLimitXaf: number
+  bnplEligible: boolean
+  commissionTier: string
+  computedAt: string
+  nextComputeAt: string
+  nextTier: string | null
+  pointsToNextTier: number
+}
+
+export const vatReportApi = {
+  async get(year: number, month: number): Promise<VatReportResponse> {
+    const r = await client.get(
+      `/api/analytics/vat-report?year=${year}&month=${month}`
+    )
+    return r.data as VatReportResponse
+  },
+
+  async downloadHtml(year: number, month: number): Promise<void> {
+    const response = await client.get(
+      `/api/analytics/vat-report/export?year=${year}&month=${month}`,
+      { responseType: 'blob' }
+    )
+    const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/html' }))
+    const link = document.createElement('a')
+    link.href = url
+    const disposition = (response.headers['content-disposition'] as string | undefined) ?? ''
+    const match = disposition.match(/filename="?([^"]+)"?/)
+    link.download = match?.[1] ?? `rapport_tva_${year}_${String(month).padStart(2, '0')}.html`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  },
+}
+
+export interface VatLineItem {
+  date: string
+  transactionRef: string
+  merchantRef: string | null
+  provider: string
+  customerPhone: string
+  amountTtc: number
+  amountHt: number
+  vatAmount: number
+  status: string
+}
+
+export interface VatPeriodSummary {
+  periodLabel: string
+  periodFrom: string
+  periodTo: string
+  totalTtc: number
+  totalHt: number
+  totalVat: number
+  transactionCount: number
+  vatRate: string
+  merchantName: string
+  merchantNiu: string | null
+  merchantAddress: string | null
+  generatedAt: string
+}
+
+export interface VatReportResponse {
+  summary: VatPeriodSummary
+  lines: VatLineItem[]
+}
+
+export const merchantScoreApi = {
+  async get(): Promise<MerchantScoreDto> {
+    const r = await client.get('/api/merchant/me/score')
+    return r.data as MerchantScoreDto
+  },
+  async refresh(): Promise<MerchantScoreDto> {
+    const r = await client.post('/api/merchant/me/score/refresh')
+    return r.data as MerchantScoreDto
   },
 }

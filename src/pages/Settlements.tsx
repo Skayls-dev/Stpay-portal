@@ -74,6 +74,7 @@ export default function Settlements() {
 
   const [processNotes, setProcessNotes] = useState<Record<string, string>>({})
   const [expandedSettlementId, setExpandedSettlementId] = useState<string | null>(null)
+  const [exporting, setExporting] = useState<string | null>(null)
 
   const [statusFilter, setStatusFilter] = useState('all')
   const [currencyFilter, setCurrencyFilter] = useState('all')
@@ -262,6 +263,15 @@ export default function Settlements() {
     setEditingProvider(providerKey)
     setEditAccountNumber(existing?.accountNumber ?? '')
     setEditHolderName(existing?.accountHolderName ?? '')
+  }
+
+  const handleExport = async (settlementId: string) => {
+    setExporting(settlementId)
+    try {
+      await settlementsApi.exportCsv(settlementId)
+    } finally {
+      setExporting(null)
+    }
   }
 
   return (
@@ -494,6 +504,8 @@ export default function Settlements() {
                       onToggleDetails={() => setExpandedSettlementId((prev) => (prev === settlement.id ? null : settlement.id))}
                       isExpanded={expandedSettlementId === settlement.id}
                       isUpdating={markProcessedMutation.isPending}
+                      onExport={() => handleExport(settlement.id)}
+                      isExporting={exporting === settlement.id}
                     />
                     {expandedSettlementId === settlement.id && (
                       <tr className="border-t border-[var(--border-soft)] bg-[var(--bg-subtle)]">
@@ -534,6 +546,8 @@ function SettlementRow({
   onToggleDetails,
   isExpanded,
   isUpdating,
+  onExport,
+  isExporting,
 }: {
   item: SettlementItem
   isSuperAdmin: boolean
@@ -543,8 +557,11 @@ function SettlementRow({
   onToggleDetails: () => void
   isExpanded: boolean
   isUpdating: boolean
+  onExport: () => void
+  isExporting: boolean
 }) {
   const isPending = (item.status || '').toLowerCase() === 'pending'
+  const isCompleted = (item.status || '').toLowerCase() === 'completed'
 
   return (
     <tr className="border-t border-[var(--border-soft)]">
@@ -563,6 +580,20 @@ function SettlementRow({
       <td className="px-3 py-2">
         <div className="flex items-center gap-2">
           <Badge color={statusColor(item.status)} dot>{statusLabel(item.status)}</Badge>
+          {isCompleted && !isSuperAdmin && (
+            <button
+              onClick={onExport}
+              disabled={isExporting}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-[var(--border-soft)] text-[var(--text-muted)] hover:border-[var(--orange)] hover:text-[var(--orange)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {isExporting ? (
+                <span className="animate-spin text-[10px]">⟳</span>
+              ) : (
+                <span>↓</span>
+              )}
+              Export CSV
+            </button>
+          )}
           {!isSuperAdmin && (
             <Button className="h-7 text-[10px]" variant="ghost" onClick={onToggleDetails}>
               {isExpanded ? 'Masquer détail' : 'Voir détail'}
@@ -589,7 +620,23 @@ function SettlementRow({
               </Button>
               </>
             ) : (
-              <span className="text-[11px] text-[var(--text-3)]">Traité le {fmtDate(item.processedAt)}</span>
+              <>
+                {isCompleted && (
+                  <button
+                    onClick={onExport}
+                    disabled={isExporting}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-[var(--border-soft)] text-[var(--text-muted)] hover:border-[var(--orange)] hover:text-[var(--orange)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isExporting ? (
+                      <span className="animate-spin text-[10px]">⟳</span>
+                    ) : (
+                      <span>↓</span>
+                    )}
+                    Export CSV
+                  </button>
+                )}
+                <span className="text-[11px] text-[var(--text-3)]">Traité le {fmtDate(item.processedAt)}</span>
+              </>
             )}
           </div>
         </td>

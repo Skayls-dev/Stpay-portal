@@ -217,9 +217,12 @@ export default function LandingPage() {
         <div className="bg-white/95 backdrop-blur-sm">
           <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[var(--orange)] text-[14px] font-extrabold text-white shadow-[0_2px_10px_rgba(255,102,0,0.28)]">ST</div>
+              <img
+                src="/stpaylogo.png"
+                alt="ST Pay"
+                className="h-9 w-auto object-contain sm:h-10"
+              />
               <div>
-                <p className="text-[15px] font-extrabold leading-tight tracking-tight">ST Pay</p>
                 <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--text-3)]">{t.brandTagline}</p>
               </div>
             </div>
@@ -246,8 +249,20 @@ export default function LandingPage() {
       </header>
 
       <main>
-        <section className="landing-reveal mx-auto grid w-full max-w-7xl gap-10 px-4 pb-12 pt-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-          <div className="space-y-7 landing-delay-1">
+        <section className="landing-reveal relative overflow-hidden border-b border-[var(--border)]">
+          <div className="absolute inset-0">
+            <img
+              src="/heroImage.png"
+              alt=""
+              className="h-full w-full object-cover"
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(112deg,rgba(8,12,22,0.72)_0%,rgba(8,12,22,0.5)_44%,rgba(246,244,239,0.26)_100%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(255,102,0,0.28)_0%,transparent_50%)]" />
+          </div>
+
+          <div className="relative mx-auto w-full max-w-7xl px-4 pb-14 pt-14">
+            <div className="max-w-3xl">
+            <div className="space-y-7 landing-delay-1 rounded-[22px] border border-white/55 bg-white/95 p-5 shadow-[0_20px_65px_rgba(0,0,0,0.24)] backdrop-blur-xl sm:p-7 lg:p-8">
             {/* Badge pill */}
             <p className="inline-flex items-center gap-2 rounded-full border border-[var(--orange-border)] bg-[var(--orange-bg)] px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--orange-dark)]">
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--orange)]" />
@@ -263,19 +278,19 @@ export default function LandingPage() {
 
             {/* Operator trust badges */}
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-semibold text-[var(--text-3)]">{t.heroOperatorLabel} :</span>
+              <span className="text-[11px] font-semibold text-[var(--text-2)]">{t.heroOperatorLabel} :</span>
               <span className="rounded-full bg-[var(--mtn-bg)] px-2.5 py-1 text-[11px] font-bold text-[var(--mtn-text)]">MTN MoMo</span>
               <span className="rounded-full bg-[var(--ora-bg)] px-2.5 py-1 text-[11px] font-bold text-[var(--ora-text)]">Orange Money</span>
             </div>
 
             {/* Problem callout */}
-            <div className="rounded-[var(--r-lg)] border-l-[3px] border-l-[var(--orange)] bg-[var(--bg-subtle)] px-5 py-4 text-[14px] leading-relaxed text-[var(--text-2)]">
+            <div className="rounded-[var(--r-lg)] border-l-[3px] border-l-[var(--orange)] bg-white/92 px-5 py-4 text-[14px] leading-relaxed text-[var(--text-2)] shadow-[inset_0_0_0_1px_var(--border-soft)]">
               <strong className="text-[var(--text-1)]">{t.heroProblem.title}</strong>{' '}
               {t.heroProblem.text}
             </div>
 
             {/* Subheading */}
-            <p className="max-w-xl text-[15px] leading-relaxed text-[var(--text-2)]">
+            <p className="max-w-xl text-[15px] leading-relaxed text-[var(--text-1)]">
               {t.subheading}
             </p>
 
@@ -283,70 +298,19 @@ export default function LandingPage() {
             <div className="flex flex-wrap items-center gap-3">
               <Link to="/register" className="btn-primary px-5 py-2.5 text-[14px]">{t.createMerchant}</Link>
               <Link to="/demo/webshop" className="btn-secondary">{t.webshopDemo}</Link>
-              <Link to="/admin/login" className="text-[12px] font-semibold text-[var(--text-3)] hover:text-[var(--text-2)] transition-colors">{t.adminLogin}</Link>
+              <Link to="/admin/login" className="text-[12px] font-semibold text-[var(--text-2)] hover:text-[var(--text-1)] transition-colors">{t.adminLogin}</Link>
             </div>
 
             {/* Metrics */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {t.metrics.map((m, idx) => (
-                <div key={m.label} className={`rounded-[12px] border border-[var(--border)] bg-white p-3.5 shadow-[0_4px_12px_rgba(0,0,0,0.04)] landing-reveal landing-delay-${idx + 1}`}>
+                <div key={m.label} className={`rounded-[12px] border border-[var(--border)] bg-white p-3.5 shadow-[0_10px_28px_rgba(0,0,0,0.1)] landing-reveal landing-delay-${idx + 1}`}>
                   <p className="text-[20px] font-extrabold leading-tight text-[var(--text-1)]">{m.value}</p>
-                  <p className="mt-0.5 text-[10px] font-medium text-[var(--text-3)]">{m.label}</p>
+                  <p className="mt-0.5 text-[10px] font-medium text-[var(--text-2)]">{m.label}</p>
                 </div>
               ))}
             </div>
           </div>
-
-          {/* Payment widget illustration */}
-          <div className="relative landing-float">
-            {/* Main checkout card */}
-            <div className="overflow-hidden rounded-[20px] border border-[var(--border)] bg-white shadow-[0_24px_60px_rgba(0,0,0,0.09)]">
-              {/* Header */}
-              <div className="flex items-center gap-2 border-b border-[var(--border)] bg-[var(--bg-subtle)] px-4 py-3">
-                <div className="flex h-6 w-6 items-center justify-center rounded-[6px] bg-[var(--orange)] text-[8px] font-extrabold text-white">ST</div>
-                <span className="text-[12px] font-bold">ST Pay</span>
-                <span className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-[var(--green)]">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[var(--green)]" /> Sécurisé
-                </span>
-              </div>
-              {/* Amount */}
-              <div className="border-b border-[var(--border)] px-5 py-4">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--text-3)]">{t.widget.amount}</p>
-                <p className="text-[28px] font-extrabold leading-tight tracking-tight">32 900 <span className="text-[16px] font-semibold text-[var(--text-3)]">XAF</span></p>
-                <p className="text-[11px] text-[var(--text-3)]">Commande #2094 · Jean Dupont</p>
-              </div>
-              {/* Operator grid */}
-              <div className="px-5 py-4">
-                <p className="mb-2.5 text-[10px] font-semibold text-[var(--text-3)]">{t.widget.chooseOp}</p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <div className="flex items-center justify-center rounded-[8px] border border-[var(--mtn-bg)] bg-[var(--mtn-bg)] py-2.5 text-[10px] font-extrabold text-[var(--mtn-text)]">MTN</div>
-                  <div className="flex items-center justify-center rounded-[8px] border-2 border-[#CC4A00] bg-[var(--ora-bg)] py-2.5 text-[10px] font-extrabold text-[var(--ora-text)] shadow-sm">ORA</div>
-                </div>
-              </div>
-              {/* CTA */}
-              <div className="px-5 pb-5">
-                <div className="w-full rounded-[10px] bg-[var(--orange)] py-3 text-center text-[13px] font-bold text-white shadow-[0_4px_14px_rgba(255,102,0,0.35)]">{t.widget.payNow}</div>
-                <p className="mt-2.5 flex items-center justify-center gap-1.5 text-[10px] font-semibold text-[var(--green)]">
-                  <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-                    <rect x="2" y="5" width="8" height="6" rx="1"/><path d="M4 5V3.5a2 2 0 014 0V5"/>
-                  </svg>
-                  {t.widget.escrowFoot}
-                </p>
-              </div>
-            </div>
-            {/* Floating chip: payment received */}
-            <div className="absolute -right-3 top-8 rounded-[10px] border border-[var(--green-border)] bg-white px-3 py-2 shadow-[0_8px_20px_rgba(0,0,0,0.12)]">
-              <p className="text-[9px] font-bold text-[var(--green)]">{t.widget.received}</p>
-              <p className="text-[8px] text-[var(--text-3)]">+32 900 XAF · MTN</p>
-            </div>
-            {/* Floating chip: webhook */}
-            <div className="absolute -left-4 bottom-20 rounded-[10px] border border-[var(--border)] bg-white px-3 py-2 shadow-[0_8px_20px_rgba(0,0,0,0.12)]">
-              <p className="text-[9px] font-bold text-[var(--text-1)]">{t.widget.webhookDelivered}</p>
-              <p className="text-[8px] text-[var(--text-3)]">en 1.8s · ORDER-2094</p>
-            </div>
-            {/* Floating chip: escrow */}
-            <div className="absolute -right-4 bottom-8 rounded-[10px] border border-[var(--border)] bg-white px-3 py-2 shadow-[0_8px_20px_rgba(0,0,0,0.12)]">
-              <p className="text-[9px] font-bold text-[var(--text-1)]">{t.widget.escrowActive}</p>
             </div>
           </div>
         </section>
