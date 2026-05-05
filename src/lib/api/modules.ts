@@ -710,6 +710,18 @@ export const escrowApi = {
     const response = await client.post(`/api/escrow/${id}/dispute`, { reason })
     return response.data
   },
+
+  async simulate(payload: {
+    amount: number
+    currency: string
+    customerPhone: string
+    description?: string
+    releaseMode: string
+    autoTimeoutDays?: number
+  }) {
+    const response = await client.post('/api/escrow/simulate', payload)
+    return response.data
+  },
 }
 
 export interface AdminMerchantApp {
