@@ -15,11 +15,14 @@ function SkeletonBlock({ className = '' }: { className?: string }) {
 }
 
 export default function EscrowAccountingWidget() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['escrow-accounting'],
     queryFn: () => escrowAccountingApi.summary(),
     staleTime: 30_000,
+    retry: 1,
   })
+
+  if (isError) return null
 
   const dominantMode = data
     ? `PickupCode ${data.pickupCodeCount} / Auto ${data.autoTimeoutCount} / Dual ${data.dualConfirmCount}`
