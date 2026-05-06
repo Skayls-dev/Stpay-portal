@@ -40,6 +40,22 @@ export const demoCatalog: DemoProduct[] = [
     badge: 'Accessoire',
     image: '/webshop/photos/powerbank.jpg',
   },
+  {
+    id: 'wireless-charger',
+    name: 'Chargeur sans fil 15W',
+    description: 'Compatible Qi, charge rapide, indicateur LED.',
+    priceXaf: 12500,
+    badge: 'Accessoire',
+    image: '/webshop/photos/charger.jpg',
+  },
+  {
+    id: 'bluetooth-speaker',
+    name: 'Enceinte Groove Mini',
+    description: 'Son 360°, etanche IPX5, autonomie 12h.',
+    priceXaf: 27900,
+    badge: 'Audio',
+    image: '/webshop/photos/speaker.jpg',
+  },
 ]
 
 export const demoProviders = [

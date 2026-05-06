@@ -1,5 +1,5 @@
 // src/components/layout/Sidebar.tsx
-import { NavLink, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../../hooks/useAuth'
 import { healthApi } from '../../lib/api/modules'
@@ -186,11 +186,13 @@ export default function Sidebar() {
 
       <div className="px-4 py-[18px] border-b border-[var(--border-soft)]">
         <div className="flex items-center gap-2.5">
-          <img
-            src="/stpaylogo.png"
-            alt="STPay"
-            className="h-8 w-auto max-w-[160px] object-contain"
-          />
+          <Link to="/" aria-label="Retour a l'accueil STPay">
+            <img
+              src="/stpaylogo.png"
+              alt="STPay"
+              className="h-8 w-auto max-w-[160px] object-contain"
+            />
+          </Link>
         </div>
         <div className="mt-2.5 inline-flex items-center gap-1.5 px-2 py-[3px] rounded-full
                         text-[10px] font-semibold font-mono border"

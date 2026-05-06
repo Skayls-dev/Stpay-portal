@@ -137,7 +137,7 @@ const Dashboard = () => {
           <span className="icon">📱</span>
           <h3>Mobile Payment Simulator</h3>
           <p>Simulez en temps réel une expérience de paiement mobile complète.</p>
-          <Link to="/simulator" className="btn btn-secondary btn-lg" style={{ marginTop: 'var(--spacing-4)' }}>
+          <Link to="/demo/simulator" className="btn btn-secondary btn-lg" style={{ marginTop: 'var(--spacing-4)' }}>
             Simulate Payment
           </Link>
         </div>

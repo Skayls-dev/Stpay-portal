@@ -464,7 +464,10 @@ export default function Settlements() {
                   <th className="px-3 py-2 text-[10px] uppercase tracking-wider text-[var(--text-4)]">Marchand</th>
                 )}
                 <th className="px-3 py-2 text-[10px] uppercase tracking-wider text-[var(--text-4)]">Origine</th>
-                <th className="px-3 py-2 text-[10px] uppercase tracking-wider text-[var(--text-4)]">Montant</th>
+                <th className="px-3 py-2 text-[10px] uppercase tracking-wider text-[var(--text-4)]">Montant brut</th>
+                {isSuperAdmin && (
+                  <th className="px-3 py-2 text-[10px] uppercase tracking-wider text-[var(--text-4)]">Commission</th>
+                )}
                 <th className="px-3 py-2 text-[10px] uppercase tracking-wider text-[var(--text-4)]">Transactions</th>
                 <th className="px-3 py-2 text-[10px] uppercase tracking-wider text-[var(--text-4)]">Période</th>
                 <th className="px-3 py-2 text-[10px] uppercase tracking-wider text-[var(--text-4)]">Payout</th>
@@ -477,13 +480,13 @@ export default function Settlements() {
             <tbody>
               {settlementsQuery.isLoading ? (
                 <tr>
-                  <td className="px-3 py-6 text-[12px] text-[var(--text-3)]" colSpan={isSuperAdmin ? 8 : 6}>
+                  <td className="px-3 py-6 text-[12px] text-[var(--text-3)]" colSpan={isSuperAdmin ? 9 : 6}>
                     Chargement…
                   </td>
                 </tr>
               ) : filteredItems.length === 0 ? (
                 <tr>
-                  <td className="px-3 py-6 text-[12px] text-[var(--text-3)]" colSpan={isSuperAdmin ? 8 : 6}>
+                  <td className="px-3 py-6 text-[12px] text-[var(--text-3)]" colSpan={isSuperAdmin ? 9 : 6}>
                     Aucun settlement pour ces filtres.
                   </td>
                 </tr>
@@ -509,7 +512,7 @@ export default function Settlements() {
                     />
                     {expandedSettlementId === settlement.id && (
                       <tr className="border-t border-[var(--border-soft)] bg-[var(--bg-subtle)]">
-                        <td className="px-3 py-3" colSpan={isSuperAdmin ? 8 : 6}>
+                        <td className="px-3 py-3" colSpan={isSuperAdmin ? 9 : 6}>
                           <SettlementTransactionsPanel settlementId={settlement.id} isSuperAdmin={isSuperAdmin} />
                         </td>
                       </tr>
@@ -570,6 +573,18 @@ function SettlementRow({
       )}
       <td className="px-3 py-2 text-[11px] text-[var(--text-2)]">{formatOrigin(item)}</td>
       <td className="px-3 py-2 text-[12px] font-semibold text-[var(--text-1)]">{fmtMoney(item.amount, item.currency)}</td>
+      {isSuperAdmin && (
+        <td className="px-3 py-2">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[12px] font-semibold" style={{ color: 'var(--red)' }}>
+              -{fmtMoney(item.feeAmount ?? 0, item.currency)}
+            </span>
+            <span className="text-[10px] text-[var(--text-4)]">
+              {item.feeRate ? `${(item.feeRate * 100).toFixed(1)} %` : '—'}
+            </span>
+          </div>
+        </td>
+      )}
       <td className="px-3 py-2 text-[12px] text-[var(--text-2)]">{item.transactionCount}</td>
       <td className="px-3 py-2 text-[11px] text-[var(--text-3)]">
         {fmtDate(item.periodFrom)} → {fmtDate(item.periodTo)}

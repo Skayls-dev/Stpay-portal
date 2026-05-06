@@ -178,6 +178,9 @@ export interface SettlementItem {
   merchantName: string
   currency: string
   amount: number
+  feeAmount: number
+  feeRate: number
+  netAmount: number
   transactionCount: number
   status: string
   periodFrom: string
@@ -732,6 +735,11 @@ export const escrowApi = {
 
   async openDispute(id: string, reason: string) {
     const response = await client.post(`/api/escrow/${id}/dispute`, { reason })
+    return response.data
+  },
+
+  async resolveDispute(id: string, resolution: 'refund_buyer' | 'release_merchant') {
+    const response = await client.post(`/api/escrow/${id}/resolve-dispute`, { resolution })
     return response.data
   },
 
@@ -1311,5 +1319,210 @@ export const merchantScoreApi = {
   async refresh(): Promise<MerchantScoreDto> {
     const r = await client.post('/api/merchant/me/score/refresh')
     return r.data as MerchantScoreDto
+  },
+}
+
+// ── Insights (predictive analytics) ─────────────────────────────────────────
+
+export interface NextSettlementDto {
+  estimatedDate: string | null   // ISO 8601
+  estimatedAmountXaf: number
+  confidence: 'high' | 'low'
+}
+
+export interface ProviderAdviceItem {
+  provider: string
+  bestHour: number
+  worstHourStart: number
+  worstSuccessRate: number
+  advice: string
+}
+
+export interface WeeklyForecastDto {
+  forecastMinXaf: number
+  forecastMaxXaf: number
+  trendPct: number
+  currentWeekXaf: number
+}
+
+export interface MerchantScoreSummaryDto {
+  score: number
+  tier: string
+  bnplEligible: boolean
+  transactionLimitXaf: number
+  computedAt: string
+}
+
+export interface MerchantInsightsDto {
+  nextSettlement: NextSettlementDto
+  providerAdvice: ProviderAdviceItem[]
+  weeklyForecast: WeeklyForecastDto
+  merchantScore: MerchantScoreSummaryDto
+  generatedAt: string
+}
+
+export const insightsApi = {
+  async get(): Promise<MerchantInsightsDto> {
+    const response = await client.get('/api/analytics/insights')
+    return response.data as MerchantInsightsDto
+  },
+}
+
+// ── Fee configurations (super admin) ────────────────────────────────────────
+
+export interface FeeConditions {
+  minAmountXaf?: number
+  maxAmountXaf?: number
+  validFrom?: string
+  validTo?: string
+}
+
+export interface FeeConfigItem {
+  id: string
+  scope: 'merchant' | 'group' | 'global'
+  merchantId?: string
+  merchantName?: string
+  groupId?: string
+  groupName?: string
+  provider: string
+  percentageFee: number  // ex: 0.02 = 2%
+  fixedFee: number
+  minFee: number
+  maxFee: number
+  isActive: boolean
+  priority: number
+  conditions?: FeeConditions
+  createdAt: string
+}
+
+export interface FeeConfigPage {
+  total: number
+  page: number
+  pageSize: number
+  items: FeeConfigItem[]
+}
+
+export interface UpsertFeeConfigPayload {
+  scope: 'merchant' | 'group' | 'global'
+  merchantId?: string
+  groupId?: string
+  provider: string
+  percentageFee: number
+  fixedFee: number
+  minFee: number
+  maxFee: number
+  isActive: boolean
+  priority: number
+  conditions?: FeeConditions
+}
+
+export interface MerchantGroupItem {
+  id: string
+  name: string
+  description?: string
+  memberCount: number
+  isActive: boolean
+  createdAt: string
+}
+
+export interface MerchantGroupMember {
+  merchantId: string
+  merchantName: string
+  createdAt: string
+}
+
+export const feeConfigApi = {
+  async list(params?: {
+    scope?: string
+    merchantId?: string
+    groupId?: string
+    isActive?: boolean
+    page?: number
+    pageSize?: number
+  }): Promise<FeeConfigPage> {
+    const response = await client.get('/api/admin/fees', { params })
+    return response.data as FeeConfigPage
+  },
+  async getOne(id: string): Promise<FeeConfigItem> {
+    const response = await client.get(`/api/admin/fees/${id}`)
+    return response.data as FeeConfigItem
+  },
+  async create(payload: UpsertFeeConfigPayload): Promise<void> {
+    await client.post('/api/admin/fees', payload)
+  },
+  async update(id: string, payload: UpsertFeeConfigPayload): Promise<void> {
+    await client.put(`/api/admin/fees/${id}`, payload)
+  },
+  async remove(id: string): Promise<void> {
+    await client.delete(`/api/admin/fees/${id}`)
+  },
+}
+
+export const merchantGroupsApi = {
+  async list(): Promise<{ groups: MerchantGroupItem[] }> {
+    const r = await client.get('/api/admin/fees/groups')
+    return r.data
+  },
+  async create(payload: { name: string; description?: string }): Promise<{ id: string }> {
+    const r = await client.post('/api/admin/fees/groups', payload)
+    return r.data
+  },
+  async update(id: string, payload: { name: string; description?: string; isActive: boolean }): Promise<void> {
+    await client.put(`/api/admin/fees/groups/${id}`, payload)
+  },
+  async remove(id: string): Promise<void> {
+    await client.delete(`/api/admin/fees/groups/${id}`)
+  },
+  async listMembers(groupId: string): Promise<{ members: MerchantGroupMember[] }> {
+    const r = await client.get(`/api/admin/fees/groups/${groupId}/members`)
+    return r.data
+  },
+  async addMember(groupId: string, merchantId: string): Promise<void> {
+    await client.post(`/api/admin/fees/groups/${groupId}/members`, { merchantId })
+  },
+  async removeMember(groupId: string, merchantId: string): Promise<void> {
+    await client.delete(`/api/admin/fees/groups/${groupId}/members/${merchantId}`)
+  },
+}
+
+// ── API key activity logs (super admin) ───────────────────────────────────
+
+export interface ApiKeyActivityItem {
+  id: string
+  merchantId?: string
+  merchantName?: string
+  applicationId?: string
+  applicationName?: string
+  action: string
+  status: string
+  reason?: string
+  actorType?: string
+  actorId?: string
+  ipAddress?: string
+  userAgent?: string
+  path?: string
+  createdAt: string
+}
+
+export interface ApiKeyActivityPage {
+  total: number
+  page: number
+  pageSize: number
+  items: ApiKeyActivityItem[]
+}
+
+export const apiKeyActivityApi = {
+  async list(params?: {
+    page?: number
+    pageSize?: number
+    merchantId?: string
+    applicationId?: string
+    action?: string
+    status?: string
+    from?: string
+    to?: string
+  }): Promise<ApiKeyActivityPage> {
+    const response = await client.get('/api/admin/api-key-activity', { params })
+    return response.data as ApiKeyActivityPage
   },
 }

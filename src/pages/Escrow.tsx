@@ -240,30 +240,6 @@ function KpiMini({ label, value, sub, accent = false }:
   )
 }
 
-// ─── Pickup code reveal ───────────────────────────────────────────────────────
-
-function PickupCode({ code, revealed, onReveal }:
-  { code?: string; revealed: boolean; onReveal: () => void }) {
-  if (!code) return <span className="text-[var(--text-muted)] text-[11px]">—</span>
-
-  return (
-    <div className="flex items-center gap-2">
-      <span className="font-mono text-[13px] tracking-[0.15em] text-[var(--text-primary)]
-                       bg-[var(--bg-subtle)] px-2.5 py-1 rounded-[var(--radius-sm)]
-                       border border-[var(--border-soft)]">
-        {revealed ? '482 917' : '••• •••'}
-      </span>
-      <button
-        onClick={onReveal}
-        className="text-[11px] text-[var(--gold)] hover:text-[var(--gold-bright)]
-                   transition-colors font-medium"
-      >
-        {revealed ? 'Masquer' : 'Afficher'}
-      </button>
-    </div>
-  )
-}
-
 // ─── Progress bar ─────────────────────────────────────────────────────────────
 
 function EscrowProgress({ status }: { status: EscrowItem['status'] }) {
@@ -297,8 +273,6 @@ function EscrowCard({ item, role, isSuperAdmin }: { item: EscrowItem; role: 'mer
   const queryClient = useQueryClient()
   const [disputeOpen, setDisputeOpen] = useState(false)
   const [disputeReason, setDisputeReason] = useState('')
-  const [pickupOpen, setPickupOpen] = useState(false)
-  const [pickupCodeInput, setPickupCodeInput] = useState('')
   const cfg = STATUS_CONFIG[item.status]
 
   const shipMutation = useMutation({
@@ -343,32 +317,11 @@ function EscrowCard({ item, role, isSuperAdmin }: { item: EscrowItem; role: 'mer
     onError: () => toast.error('Erreur lors de la confirmation de livraison'),
   })
 
-  const pickupMutation = useMutation({
-    mutationFn: (code: string) => escrowApi.confirmPickup(item.id, code),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['escrow'] })
-      queryClient.invalidateQueries({ queryKey: ['merchant-balance'] })
-      toast.success('Livraison confirmée !')
-      setPickupOpen(false)
-      setPickupCodeInput('')
-    },
-    onError: () => toast.error('Code invalide — vérifiez et réessayez'),
-  })
-
   const releaseModeBadge = item.releaseMode === 'PickupCode'
     ? { label: 'Code retrait', className: 'bg-blue-500/15 text-blue-300 border-blue-500/30' }
     : item.releaseMode === 'AutoTimeout'
       ? { label: 'Auto 7j', className: 'bg-slate-500/15 text-slate-300 border-slate-500/30' }
       : { label: 'Double conf.', className: 'bg-purple-500/15 text-purple-300 border-purple-500/30' }
-
-  const submitPickup = () => {
-    const clean = pickupCodeInput.replace(/\D/g, '').slice(0, 6)
-    if (clean.length !== 6) {
-      toast.error('Entrez un code à 6 chiffres')
-      return
-    }
-    pickupMutation.mutate(clean)
-  }
 
   return (
     <div className="bg-white border border-[var(--border)] shadow-[0_2px_8px_rgba(0,0,0,0.08)]
@@ -420,50 +373,6 @@ function EscrowCard({ item, role, isSuperAdmin }: { item: EscrowItem; role: 'mer
       {item.releaseMode === 'AutoTimeout' && item.status !== 'released' && item.autoReleaseAt && (
         <div className="text-[11px] text-[var(--text-muted)]">
           <span>Libération auto dans {daysUntil(item.autoReleaseAt)}j</span>
-        </div>
-      )}
-
-      {/* Pickup code */}
-      {item.pickupCode && (
-        <div className="flex items-center justify-between
-                        pt-3 border-t border-[var(--border-soft)]">
-          <span className="text-[11px] text-[var(--text-muted)]">Code de retrait</span>
-          <PickupCode
-            code={item.pickupCode}
-            revealed={false}
-            onReveal={() => null}
-          />
-        </div>
-      )}
-
-      {item.releaseMode === 'PickupCode' && item.status === 'in_transit' && (
-        <div className="pt-3 border-t border-[var(--border-soft)] space-y-2">
-          {!pickupOpen ? (
-            <Button
-              variant="secondary"
-              className="text-[12px]"
-              onClick={() => setPickupOpen(true)}
-            >
-              Saisir le code de retrait
-            </Button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <input
-                value={pickupCodeInput}
-                onChange={(e) => setPickupCodeInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="6 chiffres"
-                className="flex-1 rounded-[var(--radius-sm)] border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-2.5 py-1.5 text-[12px]"
-              />
-              <Button
-                variant="primary"
-                className="text-[12px]"
-                onClick={submitPickup}
-                disabled={pickupMutation.isPending}
-              >
-                {pickupMutation.isPending ? '...' : 'Confirmer'}
-              </Button>
-            </div>
-          )}
         </div>
       )}
 
@@ -574,7 +483,7 @@ export default function Escrow() {
       appFilter || undefined,
     ),
     enabled: !missingApiKey,
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
   })
 
   const items: EscrowItem[] = (Array.isArray(data) ? data : []).map((raw) => {

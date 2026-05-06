@@ -217,11 +217,13 @@ export default function LandingPage() {
         <div className="bg-white/95 backdrop-blur-sm">
           <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-2 px-2 py-2.5 sm:px-4 sm:py-3">
             <div className="flex items-center gap-3">
-              <img
-                src="/stpaylogo.png"
-                alt="ST Pay"
-                className="h-9 w-auto object-contain sm:h-10"
-              />
+              <Link to="/" aria-label="Retour a la page d'accueil">
+                <img
+                  src="/stpaylogo.png"
+                  alt="ST Pay"
+                  className="h-9 w-auto object-contain sm:h-10"
+                />
+              </Link>
               <div>
                 <p className="hidden text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--text-3)] md:block">{t.brandTagline}</p>
               </div>

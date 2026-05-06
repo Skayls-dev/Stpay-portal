@@ -1,5 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import EscrowDemoPanel from '../escrow-demo/EscrowDemoPanel'
+import { buildEscrowPayload, buildPaymentInitiationPayload, type PaymentResponse } from '../../lib/api/modules'
+import { publishEscrowDemo, publishSimulatedEscrowDemo, useActiveEscrowRecord } from '../escrow-demo/store'
 import { demoCatalog, demoProviders, type DemoProduct } from './mockCatalog'
 
 type CartLine = {
@@ -11,6 +14,8 @@ type DemoStatus = 'idle' | 'creating' | 'pending' | 'success'
 type WidgetStage = 'cart' | 'auth' | 'confirm' | 'done'
 type CheckoutMode = 'simulated' | 'live'
 type DemoFlowMode = 'widget' | 'api'
+
+const LOCAL_DEMO_API_KEY = 'sk_test_local_stpay_2026'
 
 const fmtXaf = (n: number) => `${new Intl.NumberFormat('fr-FR').format(n)} XAF`
 const PIN_PROVIDERS = new Set(['MTN', 'ORANGE', 'MOOV'])
@@ -86,6 +91,57 @@ const PROVIDER_PHONE_THEME: Record<string, {
   },
 }
 
+// ── Simulation SMS reçu par le client ──────────────────────────────────────
+function SmsSim() {
+  const active = useActiveEscrowRecord()
+  const [copied, setCopied] = useState(false)
+
+  if (!active || active.releaseMode !== 'pickup_code' || !active.pickupCode) return null
+  if (!['in_transit', 'held'].includes(active.status)) return null
+
+  const shortRef = active.escrowId.slice(-6).toUpperCase()
+
+  function copy() {
+    void navigator.clipboard.writeText(active.pickupCode!)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="rounded-[14px] border-2 border-dashed border-[var(--green-border)] bg-[var(--green-bg)] p-4 shadow-[0_4px_18px_rgba(0,180,80,0.08)]">
+      {/* En-tête "SMS reçu" */}
+      <div className="mb-3 flex items-center gap-2">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--green)] text-white text-[14px]">✉</span>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--green)]">SMS reçu — Simulation</p>
+          <p className="text-[10px] text-[var(--text-3)]">Comme reçu sur le téléphone du client après expédition</p>
+        </div>
+      </div>
+
+      {/* Bulle SMS */}
+      <div className="rounded-[12px] bg-white border border-[var(--border)] p-3 font-mono text-[12px] text-[var(--text-1)] leading-relaxed shadow-sm">
+        <p>ST Pay : Votre commande <strong>#{shortRef}</strong> est en route.</p>
+        <p className="mt-1">
+          Confirmez la réception en saisissant le code :{' '}
+          <span className="rounded-[6px] bg-[var(--orange-bg)] px-2 py-0.5 text-[15px] font-extrabold tracking-[0.25em] text-[var(--orange-dark)]">
+            {active.pickupCode}
+          </span>
+        </p>
+        <p className="mt-1 text-[10px] text-[var(--text-3)]">Dans la section "Actions client" ci-dessous.</p>
+      </div>
+
+      {/* Bouton copier */}
+      <button
+        type="button"
+        className="mt-3 btn-secondary w-full justify-center"
+        onClick={copy}
+      >
+        {copied ? '✓ Copié !' : 'Copier le code'}
+      </button>
+    </div>
+  )
+}
+
 export default function WebshopDemoFeature() {
   const [cart, setCart] = useState<Record<string, number>>({})
   const [payerName, setPayerName] = useState('Client Demo')
@@ -95,16 +151,28 @@ export default function WebshopDemoFeature() {
   const [txId, setTxId] = useState<string | null>(null)
   const [mode, setMode] = useState<CheckoutMode>('simulated')
   const [statusInfo, setStatusInfo] = useState('')
+  const [flowMode, setFlowMode] = useState<DemoFlowMode>('api')
+  const [demoTab, setDemoTab] = useState<'client' | 'merchant'>('client')
   const [widgetOpen, setWidgetOpen] = useState(false)
   const [widgetStage, setWidgetStage] = useState<WidgetStage>('cart')
   const [widgetPin, setWidgetPin] = useState('')
   const [pinError, setPinError] = useState('')
-  const [flowMode, setFlowMode] = useState<DemoFlowMode>('api')
+
   const [apiAuthOpen, setApiAuthOpen] = useState(false)
   const [apiAuthPin, setApiAuthPin] = useState('')
   const [apiAuthError, setApiAuthError] = useState('')
   const [apiAuthStage, setApiAuthStage] = useState<'auth' | 'confirm' | 'done'>('auth')
-  const [configApiKey, setConfigApiKey] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('stpay_api_key') || '' : '')
+  const [configApiKey, setConfigApiKey] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    const stored = localStorage.getItem('stpay_api_key')
+    if (stored) return stored
+    return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      ? LOCAL_DEMO_API_KEY
+      : ''
+  })
+  const [escrowEnabled, setEscrowEnabled] = useState(true)
+  const [escrowMode, setEscrowMode] = useState<'pickup_code' | 'auto_timeout' | 'dual_confirm'>('pickup_code')
+  const [starterCheckoutRequested, setStarterCheckoutRequested] = useState(false)
 
   const lines = useMemo<CartLine[]>(() => {
     return demoCatalog
@@ -133,11 +201,33 @@ export default function WebshopDemoFeature() {
     setCart((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }))
   }
 
+  const createStarterEscrowOrder = () => {
+    const starter = demoCatalog[0]
+    if (!starter) return
+
+    setFlowMode('api')
+    setEscrowEnabled(true)
+    setEscrowMode('pickup_code')
+    setProvider('MTN')
+    setPayerName('Client Escrow Demo')
+    setPayerPhone('237677123456')
+    setCart({ [starter.id]: 1 })
+    setStarterCheckoutRequested(true)
+  }
+
   const saveApiKey = () => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('stpay_api_key', configApiKey)
     }
   }
+
+  useEffect(() => {
+    if (!starterCheckoutRequested) return
+    if (!lines.length || status !== 'idle') return
+
+    setStarterCheckoutRequested(false)
+    void runCheckoutDemo()
+  }, [lines.length, starterCheckoutRequested, status])
 
   const removeFromCart = (id: string) => {
     setCart((prev) => {
@@ -166,7 +256,8 @@ export default function WebshopDemoFeature() {
     const apiKey = typeof window !== 'undefined' ? localStorage.getItem('stpay_api_key') : null
     const token = typeof window !== 'undefined' ? localStorage.getItem('stpay_token') : null
 
-    const livePayload = {
+    const merchantReference = `WEBSHOP-DEMO-${Date.now().toString().slice(-6)}`
+    const livePayload = buildPaymentInitiationPayload({
       amount: total,
       currency: 'XAF',
       provider,
@@ -175,17 +266,22 @@ export default function WebshopDemoFeature() {
         name: sanitizedName,
       },
       merchant: {
-        reference: 'WEBSHOP-DEMO-001',
+        reference: merchantReference,
         name: 'Demo Store',
         callbackUrl: `${window.location.origin}/demo/webshop`,
       },
-      description: 'Public webshop checkout demo',
+      description: escrowEnabled ? 'Public webshop checkout demo with escrow' : 'Public webshop checkout demo',
       metadata: {
         source: 'public-webshop-demo',
         ...(providerNeedsPin ? { pin: widgetPin || '1234' } : {}),
         lines: lines.map((line) => ({ id: line.product.id, qty: line.quantity })),
       },
-    }
+      escrow: buildEscrowPayload({
+        enabled: escrowEnabled,
+        releaseMode: escrowMode,
+        autoTimeoutDays: escrowMode === 'auto_timeout' ? 7 : undefined,
+      }),
+    })
 
     try {
       const controller = new AbortController()
@@ -202,12 +298,32 @@ export default function WebshopDemoFeature() {
         signal: controller.signal,
       })
 
+      clearTimeout(timer)
+
       if (response.ok) {
-        const body = await response.json() as { transactionId?: string; id?: string }
+        const body = await response.json() as PaymentResponse
         const liveTx = body.transactionId || body.id || generatedTx
         setMode('live')
         setTxId(liveTx)
-        setStatusInfo('Transaction creee via API ST Pay.')
+        setStatusInfo(escrowEnabled ? 'Transaction et escrow créés via API ST Pay.' : 'Transaction creee via API ST Pay.')
+        if (escrowEnabled && body.escrow?.escrowId) {
+          publishEscrowDemo({
+            escrowId: body.escrow.escrowId,
+            txId: liveTx,
+            orderRef: merchantReference,
+            merchantName: livePayload.merchant.name || 'Demo Store',
+            customerName: sanitizedName,
+            customerPhone: sanitizedPhone,
+            provider,
+            amount: total,
+            description: String(livePayload.description || 'Webshop escrow demo'),
+            releaseMode: escrowMode,
+            status: body.escrow.status,
+            pickupCode: body.escrow.pickupCode,
+            autoReleaseAt: body.escrow.autoReleaseAt,
+            source: 'backend',
+          })
+        }
         setStatus('pending')
         // Ouvrir modal d'auth pour Mode B
         setApiAuthOpen(true)
@@ -225,6 +341,20 @@ export default function WebshopDemoFeature() {
       }
     } catch {
       setStatusInfo('API live non joignable. Fallback en simulation locale.')
+    }
+
+    if (escrowEnabled) {
+      await publishSimulatedEscrowDemo({
+        orderRef: merchantReference,
+        merchantName: livePayload.merchant.name || 'Demo Store',
+        customerName: sanitizedName,
+        customerPhone: sanitizedPhone,
+        provider,
+        amount: total,
+        description: String(livePayload.description || 'Webshop escrow demo'),
+        releaseMode: escrowMode,
+        autoReleaseAt: escrowMode === 'auto_timeout' ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() : undefined,
+      })
     }
 
     // Fallback: ouvrir la modal aussi en cas d'erreur
@@ -333,7 +463,7 @@ export default function WebshopDemoFeature() {
     await runCheckoutDemo()
   }
 
-  const payloadPreview = {
+  const payloadPreview = buildPaymentInitiationPayload({
     amount: total,
     currency: 'XAF',
     provider,
@@ -346,12 +476,18 @@ export default function WebshopDemoFeature() {
       name: 'Demo Store',
       callbackUrl: `${window.location.origin}/demo/webshop`,
     },
+    description: escrowEnabled ? 'Public webshop checkout demo with escrow' : 'Public webshop checkout demo',
     metadata: {
       source: 'public-webshop-demo',
       ...(providerNeedsPin ? { pin: widgetPin || '1234' } : {}),
       lines: lines.map((line) => ({ id: line.product.id, qty: line.quantity })),
     },
-  }
+    escrow: buildEscrowPayload({
+      enabled: escrowEnabled,
+      releaseMode: escrowMode,
+      autoTimeoutDays: escrowMode === 'auto_timeout' ? 7 : undefined,
+    }),
+  })
 
   const sdkSnippet = `<script src=\"https://cdn.stpay.africa/web-sdk.js\"></script>\n<button id=\"stpay-btn\">Payer avec ST Pay</button>\n<script>\n  const stpay = new STPay({ publicKey: 'pk_test_xxx' });\n\n  document.getElementById('stpay-btn').onclick = () => {\n    stpay.checkout({\n      amount: ${total},\n      currency: 'XAF',\n      provider: '${provider}',\n      customer: { phoneNumber: '${payerPhone}', name: '${payerName}' },\n      merchant: { reference: 'WEBSHOP-DEMO-001' },\n      metadata: { source: 'public-webshop-demo' }\n    });\n  };\n</script>`
 
@@ -371,7 +507,37 @@ export default function WebshopDemoFeature() {
             </div>
           </div>
 
-          <div className="mt-4 grid gap-2 md:grid-cols-2">
+          {/* Onglets Client / Marchand */}
+          <div className="mt-5 inline-flex rounded-[12px] border border-[var(--border-med)] bg-[var(--bg-subtle)] p-1">
+            <button
+              type="button"
+              className={`rounded-[9px] px-5 py-2 text-[13px] font-semibold transition-colors ${
+                demoTab === 'client'
+                  ? 'bg-white text-[var(--orange)] shadow-sm'
+                  : 'text-[var(--text-2)] hover:text-[var(--text-1)]'
+              }`}
+              onClick={() => setDemoTab('client')}
+            >
+              🛒 Espace Client
+            </button>
+            <button
+              type="button"
+              className={`rounded-[9px] px-5 py-2 text-[13px] font-semibold transition-colors ${
+                demoTab === 'merchant'
+                  ? 'bg-white text-[var(--orange)] shadow-sm'
+                  : 'text-[var(--text-2)] hover:text-[var(--text-1)]'
+              }`}
+              onClick={() => setDemoTab('merchant')}
+            >
+              🏪 Espace Marchand
+            </button>
+          </div>
+        </header>
+
+        {demoTab === 'client' && (<>
+
+        <div className="rounded-[14px] border border-[var(--border)] bg-white/85 backdrop-blur p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="inline-flex rounded-[10px] border border-[var(--border-med)] bg-[var(--bg-subtle)] p-1">
               <button
                 type="button"
@@ -408,8 +574,21 @@ export default function WebshopDemoFeature() {
             <p className="mt-2 text-[11px] text-[var(--text-2)]">
               {configApiKey ? '✅ Clé API configurée - Mode B utilisera l\'authentification' : '⚠️ Aucune clé API - Mode B utilisera la simulation'}
             </p>
+            {(configApiKey === LOCAL_DEMO_API_KEY) && (
+              <p className="mt-2 text-[11px] text-[var(--text-2)]">
+                Clé locale préchargée pour le backend de développement : <strong>{LOCAL_DEMO_API_KEY}</strong>
+              </p>
+            )}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" className="btn-secondary" onClick={() => setDemoTab('merchant')}>
+                Espace marchand →
+              </button>
+              <button type="button" className="btn-primary" onClick={createStarterEscrowOrder}>
+                Démarrer une commande escrow démo
+              </button>
+            </div>
           </div>
-        </header>
+        </div>
 
         <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
           <section className="grid auto-rows-min content-start items-start gap-3 sm:grid-cols-2">
@@ -534,7 +713,7 @@ export default function WebshopDemoFeature() {
             <div className="panel">
               <div className="panel-header"><span className="panel-title">Panier</span></div>
               <div className="space-y-3 p-4">
-                {!lines.length && <p className="text-[12px] text-[var(--text-3)]">Ajoute un article pour demarrer la demo.</p>}
+                {!lines.length && <p className="text-[12px] text-[var(--text-3)])">Ajoute un article pour demarrer la demo.</p>}
                 {lines.map((line) => (
                   <div key={line.product.id} className="rounded-[10px] border border-[var(--border-soft)] p-3">
                     <div className="flex items-start justify-between gap-2">
@@ -551,13 +730,13 @@ export default function WebshopDemoFeature() {
                 ))}
 
                 <div className="grid gap-1 rounded-[10px] bg-[var(--bg-subtle)] p-3 text-[12px]">
-                  <div className="flex justify-between"><span className="text-[var(--text-2)]">Sous-total</span><strong>{fmtXaf(subtotal)}</strong></div>
-                  <div className="flex justify-between"><span className="text-[var(--text-2)]">Frais ST Pay (1.5%)</span><strong>{fmtXaf(fee)}</strong></div>
+                  <div className="flex justify-between"><span className="text-[var(--text-2)])">Sous-total</span><strong>{fmtXaf(subtotal)}</strong></div>
+                  <div className="flex justify-between"><span className="text-[var(--text-2)])">Frais ST Pay (1.5%)</span><strong>{fmtXaf(fee)}</strong></div>
                   <div className="mt-1 flex justify-between text-[14px]"><span className="font-bold">Total</span><strong>{fmtXaf(total)}</strong></div>
                 </div>
 
                 <label className="space-y-1">
-                  <span className="text-[11px] font-semibold text-[var(--text-2)]">Nom du payeur</span>
+                  <span className="text-[11px] font-semibold text-[var(--text-2)])">Nom du payeur</span>
                   <input
                     className="sp-input"
                     value={payerName}
@@ -567,7 +746,7 @@ export default function WebshopDemoFeature() {
                 </label>
 
                 <label className="space-y-1">
-                  <span className="text-[11px] font-semibold text-[var(--text-2)]">Numero du payeur (compte)</span>
+                  <span className="text-[11px] font-semibold text-[var(--text-2)])">Numero du payeur (compte)</span>
                   <input
                     className="sp-input"
                     value={payerPhone}
@@ -578,15 +757,51 @@ export default function WebshopDemoFeature() {
                 </label>
 
                 <label className="space-y-1">
-                  <span className="text-[11px] font-semibold text-[var(--text-2)]">Provider mobile money</span>
+                  <span className="text-[11px] font-semibold text-[var(--text-2)])">Provider mobile money</span>
                   <select className="sp-input" value={provider} onChange={(e) => setProvider(e.target.value)}>
                     {demoProviders.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
                   </select>
                 </label>
 
+                <div className="rounded-[10px] border border-[var(--border)] bg-[var(--bg-subtle)] p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold text-[var(--text-1)])">Escrow end-to-end</p>
+                      <p className="text-[10px] text-[var(--text-3)])">Demande un escrow réel au backend, sinon une simulation locale synchronisée.</p>
+                    </div>
+                    <button
+                      type="button"
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${escrowEnabled ? 'bg-[var(--orange)]' : 'bg-[var(--border-med)]'}`}
+                      onClick={() => setEscrowEnabled((value) => !value)}
+                    >
+                      <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${escrowEnabled ? 'translate-x-5' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+
+                  {escrowEnabled && (
+                    <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                      {[
+                        { value: 'pickup_code', label: 'Code retrait' },
+                        { value: 'dual_confirm', label: 'Double confirm.' },
+                        { value: 'auto_timeout', label: 'Auto-timeout' },
+                      ].map((option) => (
+                        <label key={option.value} className={`flex items-center gap-2 rounded-[8px] border px-2 py-2 text-[11px] ${escrowMode === option.value ? 'border-[var(--orange-border)] bg-[var(--orange-bg)] text-[var(--orange-dark)]' : 'border-[var(--border-soft)] bg-white text-[var(--text-2)]'}`}>
+                          <input
+                            type="radio"
+                            name="webshopEscrowMode"
+                            checked={escrowMode === option.value}
+                            onChange={() => setEscrowMode(option.value as typeof escrowMode)}
+                          />
+                          <span>{option.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div className="rounded-[10px] border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-3 text-[11px] text-[var(--text-2)]">
                   <p className="font-semibold">💳 Mode B - Checkout API: Crée une VRAIE transaction sur votre backend ST Pay</p>
-                  <p className="mt-1.5 text-[10px] leading-relaxed">Le bouton envoie les données du panier à votre API ST Pay (http://localhost:5169/api/Payment). Ce mode teste l'intégration API réelle avec votre backend.</p>
+                  <p className="mt-1.5 text-[10px] leading-relaxed">Le bouton envoie les données du panier à votre API ST Pay (http://localhost:5169/api/Payment). Si l'escrow est activé, le checkout inclut `escrow.enabled=true` avec le mode choisi.</p>
                 </div>
 
                 <div className="flex gap-2">
@@ -600,13 +815,14 @@ export default function WebshopDemoFeature() {
                 </div>
 
                 <div className="rounded-[10px] border border-[var(--orange-border)] bg-[var(--orange-bg)] p-3">
-                  <p className="text-[11px] font-bold text-[var(--orange-dark)]">Etat checkout</p>
+                  <p className="text-[11px] font-bold text-[var(--orange-dark)])">Etat checkout</p>
                   <p className="mt-1 text-[12px] text-[var(--text-2)]">
                     {status === 'idle' && 'Pret: panier compose et provider selectionne.'}
                     {status === 'creating' && 'Creation transaction ST Pay...'}
                     {status === 'pending' && 'Transaction en attente de confirmation mobile.'}
                     {status === 'success' && `Paiement confirme (${txId}) via mode ${mode}.`}
                   </p>
+                  {escrowEnabled && <p className="mt-2 text-[11px] text-[var(--text-2)])">Escrow demandé: <strong>{escrowMode}</strong>.</p>}
                   {status === 'pending' && !apiAuthOpen && (
                     <button type="button" className="btn-secondary mt-2" onClick={reopenApiAuth}>
                       Reprendre l'autorisation mobile
@@ -623,12 +839,25 @@ export default function WebshopDemoFeature() {
               <pre className="max-h-[300px] overflow-auto bg-[#111827] p-4 text-[11px] leading-relaxed text-[#E5E7EB]">{JSON.stringify(payloadPreview, null, 2)}</pre>
             </div>
 
+            <SmsSim />
+
+            <EscrowDemoPanel role="client" onSwitchToMerchant={() => setDemoTab('merchant')} />
+
             <div className="panel">
               <div className="panel-header"><span className="panel-title">Snippet integration Web SDK</span></div>
               <pre className="max-h-[300px] overflow-auto bg-[#0B1220] p-4 text-[11px] leading-relaxed text-[#CFE3FF]">{sdkSnippet}</pre>
             </div>
           </aside>
         </div>
+
+        </>)}
+
+        {demoTab === 'merchant' && (
+          <div className="mx-auto w-full max-w-2xl">
+            <EscrowDemoPanel role="merchant" />
+          </div>
+        )}
+
       </div>
 
       {widgetOpen && (

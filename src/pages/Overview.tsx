@@ -5,6 +5,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { analyticsApi, transactionsApi, POLL_INTERVAL_TRANSACTIONS } from '../lib/api/modules'
 import { Badge, DataTable } from '../components/ui'
+import InsightsCard from '../components/merchant/InsightsCard'
 import { IconArrowUp, IconArrowDown } from '../components/icons/NavIcons'
 import type { DataTableColumn } from '../components/ui'
 import type { Transaction } from '../lib/api/modules'
@@ -465,6 +466,8 @@ export default function Overview() {
       )}
 
       {!isSuperAdmin && <DevKitBanner />}
+
+      {!isSuperAdmin && <InsightsCard />}
 
       {/* Period tabs */}
       <div className="flex items-center justify-between">

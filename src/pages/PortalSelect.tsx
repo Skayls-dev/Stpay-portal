@@ -90,8 +90,9 @@ export default function PortalSelect() {
           </Link>
         </div>
 
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <Link to="/demo/webshop"
-              className="group mt-3 block bg-white border border-[var(--border)]
+              className="group block bg-white border border-[var(--border)]
                          rounded-[var(--r-lg)] p-5 text-left transition-all duration-150
                          hover:border-[var(--green-border)] hover:bg-[var(--green-bg)]">
           <div className="flex items-start justify-between gap-3">
@@ -116,6 +117,30 @@ export default function PortalSelect() {
             </svg>
           </div>
         </Link>
+
+        <Link to="/demo/escrow"
+              className="group block bg-white border border-[var(--border)]
+                         rounded-[var(--r-lg)] p-5 text-left transition-all duration-150
+                         hover:border-[var(--blue-border)] hover:bg-[var(--blue-bg)]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--blue)] mb-1">Demo Publique</p>
+              <h2 className="font-extrabold text-[16px] text-[var(--text-1)] mb-2 tracking-tight">Suivi Escrow ST Pay</h2>
+              <p className="text-[12px] text-[var(--text-2)] leading-relaxed">
+                Suivez et gérez le cycle complet d'une transaction sécurisée par escrow.
+              </p>
+            </div>
+            <span className="st-badge st-badge-blue">Public</span>
+          </div>
+          <div className="mt-4 flex items-center gap-1 text-[11px] text-[var(--blue)] font-semibold
+                          opacity-0 group-hover:opacity-100 transition-opacity">
+            Ouvrir la demo
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+        </Link>
+        </div>
 
         <p className="mt-6 text-center text-[11px] text-[var(--text-4)]">
           ST Pay · Payment Gateway for West Africa

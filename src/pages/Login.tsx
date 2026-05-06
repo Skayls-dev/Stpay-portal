@@ -22,11 +22,13 @@ const INPUT = (err: boolean) =>
 
 function BrandLogo({ compact = false }: { compact?: boolean }) {
   return (
-    <img
-      src="/stpaylogo.png"
-      alt="STPay"
-      className={compact ? 'mx-auto h-10 w-auto max-w-[200px] object-contain' : 'mx-auto h-12 w-auto max-w-[240px] object-contain'}
-    />
+    <Link to="/" aria-label="Retour a la page d'accueil STPay" className="inline-block">
+      <img
+        src="/stpaylogo.png"
+        alt="STPay"
+        className={compact ? 'mx-auto h-10 w-auto max-w-[200px] object-contain' : 'mx-auto h-12 w-auto max-w-[240px] object-contain'}
+      />
+    </Link>
   )
 }
 

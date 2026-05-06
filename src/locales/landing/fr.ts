@@ -96,19 +96,19 @@ const fr: LandingLocale = {
   features: [
     {
       title: 'Zéro client perdu à la caisse',
-      text: 'Un seul lien de paiement accepte MTN MoMo et Orange Money. Votre client choisit son opérateur — vous encaissez toujours.',
+      text: 'Ton client peut payer avec MTN ou Orange. Tu acceptes tout, tu ne refuses personne, tu fais plus de ventes.',
     },
     {
-      title: 'Fonds garantis à la livraison',
-      text: 'L\'escrow natif retient le paiement jusqu\'à confirmation de réception. Vous expédiez sans risque — l\'acheteur ne peut pas annuler après l\'envoi.',
+      title: 'Ton argent est sécurisé jusqu\'à la livraison',
+      text: 'L\'argent est gardé en sécurité. Tu es payé seulement quand le client reçoit le colis. Pas de mauvaise surprise, pas d\'annulation après envoi.',
     },
     {
-      title: 'Tableau de bord en temps réel',
-      text: 'Chaque paiement, chaque statut, chaque webhook — visible dans votre portail marchand. Plus de SMS à surveiller manuellement.',
+      title: 'Tu vois tout ce qui se passe en direct',
+      text: 'Tu peux voir tous tes paiements sur ton téléphone ou ton ordinateur. Tu sais qui a payé, combien, et quand, sans stress.',
     },
     {
-      title: 'Intégration en quelques jours',
-      text: 'API REST documentée, SDK disponibles, sandbox immédiat. Vos développeurs intègrent en moins d\'une semaine.',
+      title: 'Installation rapide et facile',
+      text: 'Le système est simple à installer. En quelques jours, tu peux déjà commencer à encaisser.',
     },
   ],
   steps: [

@@ -6,7 +6,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import { Link } from 'react-router-dom'
 import client from '../lib/api/client'
+import { publishEscrowDemo } from '../features/escrow-demo/store'
 import {
   PAYMENT_POLL_INTERVAL_MS,
   PAYMENT_POLL_MAX_ATTEMPTS,
@@ -742,6 +744,10 @@ function providerLabel(name: string) {
   return PROVIDER_LABELS[name] ?? name
 }
 
+function canPublishEscrowFromResult(result: TxResult | null) {
+  return Boolean(result?.escrow?.escrowId)
+}
+
 export default function PaymentSimulator() {
   const [state, setState] = useState<SimState>('idle')
   const [form, setForm] = useState<PaymentForm>({
@@ -798,6 +804,30 @@ export default function PaymentSimulator() {
   const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
     setLogs((prev) => [...prev, { time: nowTime(), message, type }])
   }, [])
+
+  const publishEscrowScenario = useCallback((escrow: TxResult['escrow'] | undefined, txIdentifier: string) => {
+    if (!escrow?.escrowId) {
+      return
+    }
+
+    publishEscrowDemo({
+      escrowId: escrow.escrowId,
+      txId: txIdentifier,
+      orderRef: form.ref,
+      merchantName: 'ST Pay Simulator',
+      customerName: form.name,
+      customerPhone: form.phone,
+      provider: form.provider,
+      amount: form.amount,
+      description: form.description,
+      releaseMode: form.escrowMode,
+      status: escrow.status,
+      pickupCode: escrow.pickupCode,
+      autoReleaseAt: escrow.autoReleaseAt,
+      source: 'backend',
+    })
+    addLog('Scénario escrow synchronisé vers la démo webshop.', 'ok')
+  }, [addLog, form.amount, form.description, form.escrowMode, form.name, form.phone, form.provider, form.ref])
 
   // Step derived from state
   const step: 1 | 2 | 3 =
@@ -897,6 +927,10 @@ export default function PaymentSimulator() {
         escrow: data.escrow,
       })
 
+      if (form.escrowEnabled && data.escrow?.escrowId) {
+        publishEscrowScenario(data.escrow, id)
+      }
+
       setState('waiting_phone')
     },
     onError: (e: Error) => {
@@ -963,6 +997,17 @@ export default function PaymentSimulator() {
   return (
     <div className="space-y-4">
       <StepBar current={step} />
+
+      <div className="grid gap-3 lg:grid-cols-[1fr_260px]">
+        <div className="rounded-[10px] border border-[var(--orange-border)] bg-[var(--orange-bg)] px-3 py-2 text-[12px] text-[var(--orange-dark)]">
+          <span className="font-semibold">Espace marchand</span>
+          <span className="ml-2 text-[var(--text-2)]">Configure et initie le paiement depuis ce panneau.</span>
+        </div>
+        <div className="rounded-[10px] border border-[var(--blue-border)] bg-[var(--blue-bg)] px-3 py-2 text-[12px] text-[var(--blue)]">
+          <span className="font-semibold">Téléphone client simulé</span>
+          <span className="ml-2">Utilisé uniquement pour répondre à la requête USSD.</span>
+        </div>
+      </div>
 
       <div className="grid lg:grid-cols-[1fr_260px] gap-4 items-start">
         {/* LEFT */}
@@ -1196,24 +1241,35 @@ export default function PaymentSimulator() {
 
           <EventLog entries={logs} />
           <ResultCard result={result} />
+          <div className="rounded-[10px] border border-[var(--border)] bg-[var(--bg-subtle)] px-3 py-2 text-[12px] text-[var(--text-2)]">
+            Le parcours client est disponible sur une page séparée dans <Link to="/demo/webshop" className="font-semibold text-[var(--blue)] underline">le webshop public</Link>.
+          </div>
           <HistoryPanel entries={history} />
         </div>
 
         {/* RIGHT: phone */}
-        <div className="lg:sticky lg:top-4">
-          <SimulatedPhone
-            screen={phoneScreen}
-            provider={form.provider}
-            txId={txId ?? undefined}
-            amount={form.amount}
-            ref_={form.ref}
-            desc={form.description}
-            onConfirm={handleConfirm}
-            onCancel={handleCancel}
-            onReset={handleReset}
-            polling={polling}
-            pollCount={pollCount}
-          />
+        <div className="panel lg:sticky lg:top-4">
+          <div className="panel-header">
+            <span className="panel-title">Téléphone client simulé</span>
+          </div>
+          <div className="p-3">
+            <p className="mb-3 rounded-[10px] border border-[var(--blue-border)] bg-[var(--blue-bg)] px-3 py-2 text-[11px] text-[var(--blue)]">
+              Cette zone ne représente pas un second tableau de bord: elle sert uniquement à valider ou refuser la requête USSD du client.
+            </p>
+            <SimulatedPhone
+              screen={phoneScreen}
+              provider={form.provider}
+              txId={txId ?? undefined}
+              amount={form.amount}
+              ref_={form.ref}
+              desc={form.description}
+              onConfirm={handleConfirm}
+              onCancel={handleCancel}
+              onReset={handleReset}
+              polling={polling}
+              pollCount={pollCount}
+            />
+          </div>
         </div>
       </div>
     </div>

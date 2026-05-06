@@ -25,6 +25,7 @@ import LandingPage from './pages/LandingPage';
 const DeveloperPortal  = React.lazy(() => import('./pages/DeveloperPortal'));
 const PaymentSimulator = React.lazy(() => import('./pages/PaymentSimulator'));
 const WebshopPublicDemo = React.lazy(() => import('./pages/WebshopPublicDemo'));
+const EscrowDemoPage    = React.lazy(() => import('./pages/EscrowDemoPage'));
 const IntegrationGuides = React.lazy(() => import('./pages/IntegrationGuides'));
 const GuideVideos       = React.lazy(() => import('./pages/GuideVideos'));
 const QuickStartGuide   = React.lazy(() => import('./pages/QuickStartGuide'));
@@ -78,6 +79,8 @@ function App() {
         <Route path="/accept-invite"   element={<AcceptInvite />} />
         <Route path="/merchant/psi" element={<Navigate to="/merchant" replace />} />
         <Route path="/demo/webshop"   element={<WebshopPublicDemo />} />
+        <Route path="/demo/simulator" element={<PaymentSimulator />} />
+        <Route path="/demo/escrow"    element={<EscrowDemoPage />} />
         <Route path="/developer-portal" element={<Navigate to="/merchant/developer" replace />} />
         <Route path="/quick-start"    element={<Navigate to="/merchant/quick-start" replace />} />
         <Route path="/" element={<LandingPage />} />
