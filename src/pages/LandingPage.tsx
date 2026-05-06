@@ -207,7 +207,7 @@ export default function LandingPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_20%_0%,#FFF1E8_0%,#F6F4EF_48%,#EAF2FF_100%)] text-[var(--text-1)]">
+    <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_20%_0%,#FFF1E8_0%,#F6F4EF_48%,#EAF2FF_100%)] text-[var(--text-1)]">
       <header className="sticky top-0 z-30 shadow-[0_1px_0_var(--border)]">
         {/* Announcement bar */}
         <div className="hidden border-b border-[var(--orange-border)] bg-[var(--orange-bg)] px-4 py-[7px] text-center text-[11px] font-semibold tracking-[0.01em] text-[var(--orange-dark)] sm:block">
@@ -215,7 +215,7 @@ export default function LandingPage() {
         </div>
         {/* Nav bar */}
         <div className="bg-white/95 backdrop-blur-sm">
-          <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-3">
+          <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-2 px-2 py-2.5 sm:px-4 sm:py-3">
             <div className="flex items-center gap-3">
               <img
                 src="/stpaylogo.png"
@@ -223,7 +223,7 @@ export default function LandingPage() {
                 className="h-9 w-auto object-contain sm:h-10"
               />
               <div>
-                <p className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--text-3)]">{t.brandTagline}</p>
+                <p className="hidden text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--text-3)] md:block">{t.brandTagline}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -242,7 +242,7 @@ export default function LandingPage() {
               <div className="hidden h-4 w-px bg-[var(--border)] sm:block" />
               <Link to="/demo/webshop" className="btn-secondary hidden sm:inline-flex">{t.webshopDemo}</Link>
               <Link to="/merchant/login" className="hidden text-[13px] font-semibold text-[var(--text-2)] hover:text-[var(--text-1)] sm:block">{t.merchantLogin}</Link>
-              <Link to="/register" className="btn-primary">{t.createMerchant}</Link>
+              <Link to="/register" className="btn-primary px-2.5 py-1.5 text-[10.5px] max-[360px]:px-2 max-[360px]:text-[10px] sm:px-4 sm:py-2.5 sm:text-[13px]">{t.createMerchant}</Link>
             </div>
           </div>
         </div>
@@ -251,26 +251,32 @@ export default function LandingPage() {
       <main>
         <section className="landing-reveal relative overflow-hidden border-b border-[var(--border)]">
           <div className="absolute inset-0">
-            <img
-              src="/heroImage.png"
-              alt=""
-              className="h-full w-full object-cover"
-            />
+            <picture>
+              <source srcSet="/heroImage.optimized.avif" type="image/avif" />
+              <source srcSet="/heroImage.optimized.webp" type="image/webp" />
+              <img
+                src="/heroImage.optimized.jpg"
+                alt=""
+                className="h-full w-full object-cover"
+                decoding="async"
+                fetchPriority="high"
+              />
+            </picture>
             <div className="absolute inset-0 bg-[linear-gradient(112deg,rgba(8,12,22,0.72)_0%,rgba(8,12,22,0.5)_44%,rgba(246,244,239,0.26)_100%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,rgba(255,102,0,0.28)_0%,transparent_50%)]" />
           </div>
 
-          <div className="relative mx-auto w-full max-w-7xl px-4 pb-14 pt-14">
-            <div className="max-w-3xl">
-            <div className="space-y-7 landing-delay-1 rounded-[22px] border border-white/55 bg-white/95 p-5 shadow-[0_20px_65px_rgba(0,0,0,0.24)] backdrop-blur-xl sm:p-7 lg:p-8">
+          <div className="relative mx-auto w-full max-w-7xl px-2 pb-7 pt-7 sm:px-4 sm:pb-12 sm:pt-12 lg:pb-14 lg:pt-14">
+            <div className="max-w-2xl lg:max-w-3xl">
+            <div className="space-y-4 landing-delay-1 rounded-[16px] border border-white/55 bg-white/95 p-3 shadow-[0_14px_35px_rgba(0,0,0,0.18)] backdrop-blur-xl max-[360px]:space-y-3 max-[360px]:p-2.5 sm:space-y-6 sm:rounded-[22px] sm:p-6 lg:p-7">
             {/* Badge pill */}
-            <p className="inline-flex items-center gap-2 rounded-full border border-[var(--orange-border)] bg-[var(--orange-bg)] px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--orange-dark)]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--orange)]" />
+            <p className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[var(--orange-border)] bg-[var(--orange-bg)] px-2.5 py-1 text-center text-[8px] font-bold uppercase leading-tight tracking-[0.08em] text-[var(--orange-dark)] max-[360px]:px-2 max-[360px]:text-[7px] sm:gap-2 sm:px-3.5 sm:py-1.5 sm:text-[11px] sm:tracking-[0.12em]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--orange)] max-[360px]:hidden" />
               {t.badge}
             </p>
 
             {/* Headline with orange highlight */}
-            <h1 className="max-w-3xl text-[40px] font-extrabold leading-[1.08] tracking-tight sm:text-[52px] lg:text-[58px]">
+            <h1 className="max-w-3xl text-[24px] font-extrabold leading-[1.06] tracking-tight max-[360px]:text-[21px] sm:text-[38px] md:text-[48px] lg:text-[56px] xl:text-[58px]">
               {t.headingPart1}
               <span className="text-[var(--orange)]">{t.headingHighlight}</span>
               {t.headingPart2}
@@ -284,20 +290,20 @@ export default function LandingPage() {
             </div>
 
             {/* Problem callout */}
-            <div className="rounded-[var(--r-lg)] border-l-[3px] border-l-[var(--orange)] bg-white/92 px-5 py-4 text-[14px] leading-relaxed text-[var(--text-2)] shadow-[inset_0_0_0_1px_var(--border-soft)]">
+            <div className="rounded-[var(--r-lg)] border-l-[3px] border-l-[var(--orange)] bg-white/92 px-3.5 py-3 text-[12px] leading-relaxed text-[var(--text-2)] shadow-[inset_0_0_0_1px_var(--border-soft)] max-[360px]:px-3 max-[360px]:py-2.5 max-[360px]:text-[11.5px] sm:px-5 sm:py-4 sm:text-[14px]">
               <strong className="text-[var(--text-1)]">{t.heroProblem.title}</strong>{' '}
               {t.heroProblem.text}
             </div>
 
             {/* Subheading */}
-            <p className="max-w-xl text-[15px] leading-relaxed text-[var(--text-1)]">
+            <p className="max-w-xl text-[13px] leading-relaxed text-[var(--text-1)] max-[360px]:text-[12px] sm:text-[15px]">
               {t.subheading}
             </p>
 
             {/* CTAs */}
-            <div className="flex flex-wrap items-center gap-3">
-              <Link to="/register" className="btn-primary px-5 py-2.5 text-[14px]">{t.createMerchant}</Link>
-              <Link to="/demo/webshop" className="btn-secondary">{t.webshopDemo}</Link>
+            <div className="flex flex-col items-stretch gap-2.5 sm:flex-row sm:items-center sm:gap-3">
+              <Link to="/register" className="btn-primary inline-flex w-full justify-center px-4 py-2.5 text-[13px] max-[360px]:px-3 max-[360px]:py-2 max-[360px]:text-[12px] sm:w-auto sm:px-5 sm:text-[14px]">{t.createMerchant}</Link>
+              <Link to="/demo/webshop" className="btn-secondary inline-flex w-full justify-center text-[13px] max-[360px]:py-2 max-[360px]:text-[12px] sm:w-auto sm:text-[14px]">{t.webshopDemo}</Link>
             </div>
 
 
@@ -306,20 +312,20 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="landing-reveal landing-delay-1 mx-auto w-full max-w-7xl px-4 pb-8">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <section className="landing-reveal landing-delay-1 mx-auto w-full max-w-7xl px-2 pb-8 sm:px-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:gap-4 xl:grid-cols-4">
             {t.features.map((feature, idx) => (
               <article
                 key={feature.title}
-                className={`rounded-[14px] border border-[var(--border)] bg-white p-5
+                className={`rounded-[14px] border border-[var(--border)] bg-white p-4 sm:p-5
                 hover:border-[var(--orange-border)]
                 hover:shadow-[0_4px_16px_rgba(255,102,0,0.07)]
                 transition-all duration-200
                 landing-reveal landing-delay-${idx + 1}`}
               >
                 {featureIllustrations[idx]}
-                <h2 className="text-[14px] font-bold tracking-tight text-[var(--text-1)]">{feature.title}</h2>
-                <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--text-2)]">{feature.text}</p>
+                <h2 className="text-[13px] font-bold tracking-tight text-[var(--text-1)] sm:text-[14px]">{feature.title}</h2>
+                <p className="mt-1.5 text-[11.5px] leading-relaxed text-[var(--text-2)] sm:text-[12px]">{feature.text}</p>
               </article>
             ))}
           </div>
@@ -327,10 +333,10 @@ export default function LandingPage() {
 
         {/* Trust stats strip */}
         <section className="landing-reveal landing-delay-1 border-y border-[var(--border)] bg-white">
-          <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-around gap-x-6 gap-y-4 px-4 py-6">
+          <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-4 px-2 py-5 sm:px-4 sm:py-6">
             {t.socialProof.trustStats.map((s) => (
               <div key={s.label} className="flex flex-col items-center gap-0.5 text-center">
-                <span className="text-[26px] font-extrabold leading-none tracking-tight text-[var(--text-1)]">{s.value}</span>
+                <span className="text-[22px] font-extrabold leading-none tracking-tight text-[var(--text-1)] sm:text-[26px]">{s.value}</span>
                 <span className="text-[11px] font-medium text-[var(--text-3)]">{s.label}</span>
               </div>
             ))}
@@ -338,18 +344,18 @@ export default function LandingPage() {
         </section>
 
         {/* Testimonials */}
-        <section className="landing-reveal landing-delay-1 mx-auto w-full max-w-7xl px-4 py-12">
+        <section className="landing-reveal landing-delay-1 mx-auto w-full max-w-7xl px-2 py-10 sm:px-4 sm:py-12">
           <div className="mb-8 text-center">
             <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--orange-dark)]">
               {t.socialProof.eyebrow}
             </p>
-            <h3 className="text-[24px] font-extrabold tracking-tight">{t.socialProof.heading}</h3>
+            <h3 className="text-[22px] font-extrabold tracking-tight sm:text-[24px]">{t.socialProof.heading}</h3>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:gap-4">
             {t.socialProof.quotes.map((q, idx) => (
               <div
                 key={q.name}
-                className={`landing-reveal landing-delay-${idx + 1} flex flex-col justify-between rounded-[16px] border border-[var(--border)] bg-white p-6 shadow-[0_4px_18px_rgba(0,0,0,0.05)]`}
+                className={`landing-reveal landing-delay-${idx + 1} flex flex-col justify-between rounded-[16px] border border-[var(--border)] bg-white p-5 shadow-[0_4px_18px_rgba(0,0,0,0.05)] sm:p-6`}
               >
                 {/* Stars */}
                 <div className="mb-4 flex gap-0.5">
@@ -380,12 +386,12 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="landing-reveal landing-delay-2 mx-auto w-full max-w-7xl px-4 pb-12">
-          <div className="rounded-[18px] border border-[var(--border)] bg-white p-5 shadow-[0_12px_30px_rgba(0,0,0,0.06)]">
+        <section className="landing-reveal landing-delay-2 mx-auto w-full max-w-7xl px-2 pb-10 sm:px-4 sm:pb-12">
+          <div className="rounded-[18px] border border-[var(--border)] bg-white p-4 shadow-[0_12px_30px_rgba(0,0,0,0.06)] sm:p-5">
             <div className="mb-4 flex items-end justify-between gap-3">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--blue)]">{t.quickImplementation}</p>
-                <h3 className="text-[24px] font-extrabold tracking-tight">{t.integrationTitle}</h3>
+                <h3 className="text-[22px] font-extrabold tracking-tight sm:text-[24px]">{t.integrationTitle}</h3>
               </div>
               <Link to="/demo/webshop" className="btn-secondary">{t.viewPublicDemo}</Link>
             </div>
@@ -402,10 +408,10 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="landing-reveal landing-delay-2 mx-auto w-full max-w-7xl px-4 pb-16">
+        <section className="landing-reveal landing-delay-2 mx-auto w-full max-w-7xl px-2 pb-12 sm:px-4 sm:pb-16">
           <div className="overflow-hidden rounded-[20px] border border-[var(--border)] bg-white shadow-[0_16px_40px_rgba(0,0,0,0.07)] lg:grid lg:grid-cols-[1fr_1.6fr]">
             {/* Left aside */}
-            <aside className="flex flex-col justify-between gap-6 bg-gradient-to-b from-[var(--orange-bg)] to-white p-7 lg:p-8">
+            <aside className="flex flex-col justify-between gap-6 bg-gradient-to-b from-[var(--orange-bg)] to-white p-5 sm:p-7 lg:p-8">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--orange-dark)]">Contact</p>
                 <h4 className="mt-2 text-[22px] font-extrabold leading-tight tracking-tight">{t.leadTitle}</h4>
@@ -432,7 +438,7 @@ export default function LandingPage() {
             </aside>
 
             {/* Right form */}
-            <form onSubmit={onLeadSubmit} className="p-7 lg:p-8">
+            <form onSubmit={onLeadSubmit} className="p-5 sm:p-7 lg:p-8">
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="text-[12px] font-semibold text-[var(--text-2)]">
                   {t.leadFields.name} *
@@ -540,7 +546,7 @@ export default function LandingPage() {
       </main>
 
       <footer className="border-t border-[var(--border)] bg-white">
-        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4">
+        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3 px-2 py-4 sm:px-4">
           <p className="text-[12px] text-[var(--text-3)]">{t.footerTagline}</p>
           <div className="flex gap-2">
             <Link to="/login" className="btn-secondary">{t.portals}</Link>
